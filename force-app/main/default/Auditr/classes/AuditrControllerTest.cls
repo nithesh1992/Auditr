@@ -48,6 +48,7 @@ private class AuditrControllerTest {
     @IsTest
     private static void shouldScheduleUnscheduleAndRunBatches_WhenAdminActionsInvoked() {
         Id scheduledId;
+        Id scheduledPurgeId;
         AuditrController.ControlCenterStatusDTO scheduledStatus;
         Id syncJobId;
         Id reclassifyJobId;
@@ -56,8 +57,10 @@ private class AuditrControllerTest {
         System.runAs(new User(Id = UserInfo.getUserId())) {
             Test.startTest();
             scheduledId = AuditrController.scheduleDailySync(3);
+            scheduledPurgeId = AuditrController.scheduleDailyPurge(4);
             scheduledStatus = AuditrController.getControlCenterStatus();
             AuditrController.unscheduleDailySync();
+            AuditrController.unscheduleDailyPurge();
             syncJobId = AuditrController.runSyncNow();
             reclassifyJobId = AuditrController.runReclassify(true);
             purgeJobId = AuditrController.runPurgeNow();
@@ -65,7 +68,11 @@ private class AuditrControllerTest {
         }
 
         Assert.isNotNull(scheduledId, 'scheduleDailySync should return a CronTrigger Id');
-        Assert.isTrue(scheduledStatus.isScheduled, 'Control Center status should reflect active schedule');
+        Assert.isNotNull(scheduledPurgeId, 'scheduleDailyPurge should return a CronTrigger Id');
+        Assert.isTrue(scheduledStatus.isScheduled, 'Control Center status should reflect active sync schedule');
+        Assert.areEqual(3, scheduledStatus.scheduledSyncHour, 'Scheduled sync hour should be parsed from CronExpression');
+        Assert.isTrue(scheduledStatus.isPurgeScheduled, 'Control Center status should reflect active purge schedule');
+        Assert.areEqual(4, scheduledStatus.scheduledPurgeHour, 'Scheduled purge hour should be parsed from CronExpression');
         Assert.isNotNull(syncJobId, 'runSyncNow should return a batch job Id');
         Assert.isNotNull(reclassifyJobId, 'runReclassify should return a batch job Id');
         Assert.isNotNull(purgeJobId, 'runPurgeNow should return a batch job Id');

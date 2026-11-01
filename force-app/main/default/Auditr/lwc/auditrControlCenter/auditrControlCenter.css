@@ -84,19 +84,42 @@
     margin: 0;
 }
 
+.schedule-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+@media (max-width: 900px) {
+    .schedule-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .schedule-box {
     display: flex;
     align-items: flex-end;
     flex-wrap: wrap;
-    gap: 1rem;
+    gap: 0.875rem;
     padding: 0.875rem 1rem;
     background: #ffffff;
     border: 1px solid #e2e8f0;
     border-radius: 0.5rem;
 }
 
+.schedule-box-sync {
+    background: #f0fdf4;
+    border-color: #bbf7d0;
+}
+
+.schedule-box-purge {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
 .schedule-hour-picker {
-    min-width: 15rem;
+    flex: 1 1 13rem;
+    min-width: 12rem;
 }
 
 .schedule-actions {

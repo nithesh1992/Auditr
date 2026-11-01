@@ -81,6 +81,7 @@ private class AuditrBatchTest {
             Retention_Days__c = 0
         );
         new AuditrPurgeBatch().start(null);
+        new AuditrPurgeBatch().execute((SchedulableContext) null);
 
         AuditrUtil.testSettingOverride = new Auditr_Setting__mdt(
             DeveloperName = 'PurgeEnabled',
@@ -91,7 +92,7 @@ private class AuditrBatchTest {
         );
 
         Test.startTest();
-        Database.executeBatch(new AuditrPurgeBatch(), 200);
+        new AuditrPurgeBatch().execute((SchedulableContext) null);
         Test.stopTest();
         AuditrUtil.testSettingOverride = null;
 

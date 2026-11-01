@@ -3,6 +3,8 @@
  */
 public with sharing class AuditrController {
     public static final String SCHEDULED_JOB_NAME = 'Auditr_Daily_Sync';
+    public static final String SCHEDULED_PURGE_JOB_NAME = 'Auditr_Daily_Purge';
+    public static final Integer DEFAULT_PURGE_HOUR = 3;
     private static final Integer STALE_SYNC_HOURS = 36;
     private static final Integer TOTAL_COUNT_CAP = 25000;
     private static final Integer KPI_COUNT_CAP = 5000;
@@ -49,9 +51,15 @@ public with sharing class AuditrController {
         @AuraEnabled public Integer unclassifiedEntries;
         @AuraEnabled public DateTime lastSyncedOccurredAt;
         @AuraEnabled public Boolean isScheduled;
+        @AuraEnabled public Integer scheduledSyncHour;
         @AuraEnabled public DateTime nextFireTime;
         @AuraEnabled public String scheduleOwnerUsername;
         @AuraEnabled public Boolean isScheduleOwnerActive;
+        @AuraEnabled public Boolean isPurgeScheduled;
+        @AuraEnabled public Integer scheduledPurgeHour;
+        @AuraEnabled public DateTime nextPurgeFireTime;
+        @AuraEnabled public String purgeScheduleOwnerUsername;
+        @AuraEnabled public Boolean isPurgeScheduleOwnerActive;
         @AuraEnabled public Boolean isStaleSync;
         @AuraEnabled public String healthWarning;
         @AuraEnabled public List<JobSummaryDTO> recentJobs;
@@ -233,7 +241,31 @@ public with sharing class AuditrController {
      */
     @AuraEnabled
     public static void unscheduleDailySync() {
-        String jobPattern = SCHEDULED_JOB_NAME + '%';
+        abortScheduledJobsByPrefix(SCHEDULED_JOB_NAME);
+    }
+
+    /**
+     * @description Schedules AuditrPurgeBatch to run daily at the specified hour (0..23).
+     * @param hourOfDay Hour of day (0-23); defaults to DEFAULT_PURGE_HOUR (3 AM) when null or out of range.
+     * @return Scheduled CronTrigger Id.
+     */
+    @AuraEnabled
+    public static Id scheduleDailyPurge(Integer hourOfDay) {
+        unscheduleDailyPurge();
+        Integer targetHour = (hourOfDay != null && hourOfDay >= 0 && hourOfDay <= 23) ? hourOfDay : DEFAULT_PURGE_HOUR;
+        return System.schedule(SCHEDULED_PURGE_JOB_NAME, '0 0 ' + targetHour + ' * * ?', new AuditrPurgeBatch());
+    }
+
+    /**
+     * @description Aborts any existing Auditr_Daily_Purge scheduled jobs.
+     */
+    @AuraEnabled
+    public static void unscheduleDailyPurge() {
+        abortScheduledJobsByPrefix(SCHEDULED_PURGE_JOB_NAME);
+    }
+
+    private static void abortScheduledJobsByPrefix(String jobNamePrefix) {
+        String jobPattern = jobNamePrefix + '%';
         for (CronTrigger job : [SELECT Id FROM CronTrigger WHERE CronJobDetail.Name LIKE :jobPattern WITH SYSTEM_MODE]) {
             System.abortJob(job.Id);
         }
@@ -246,22 +278,65 @@ public with sharing class AuditrController {
     }
 
     private static void populateScheduleStatus(ControlCenterStatusDTO status) {
-        String jobPattern = SCHEDULED_JOB_NAME + '%';
+        CronTrigger syncJob = queryLatestScheduledJob(SCHEDULED_JOB_NAME);
+        if (syncJob == null) {
+            status.isScheduled = false;
+            status.scheduledSyncHour = status.preferredSyncHour;
+            status.isScheduleOwnerActive = true;
+        } else {
+            status.isScheduled = true;
+            status.scheduledSyncHour = parseCronHour(syncJob.CronExpression, status.preferredSyncHour);
+            status.nextFireTime = syncJob.NextFireTime;
+            User syncOwner = queryUserById(syncJob.OwnerId);
+            status.scheduleOwnerUsername = syncOwner?.Username;
+            status.isScheduleOwnerActive = (syncOwner != null && syncOwner.IsActive);
+        }
+
+        CronTrigger purgeJob = queryLatestScheduledJob(SCHEDULED_PURGE_JOB_NAME);
+        if (purgeJob == null) {
+            status.isPurgeScheduled = false;
+            status.scheduledPurgeHour = DEFAULT_PURGE_HOUR;
+            status.isPurgeScheduleOwnerActive = true;
+        } else {
+            status.isPurgeScheduled = true;
+            status.scheduledPurgeHour = parseCronHour(purgeJob.CronExpression, DEFAULT_PURGE_HOUR);
+            status.nextPurgeFireTime = purgeJob.NextFireTime;
+            User purgeOwner = queryUserById(purgeJob.OwnerId);
+            status.purgeScheduleOwnerUsername = purgeOwner?.Username;
+            status.isPurgeScheduleOwnerActive = (purgeOwner != null && purgeOwner.IsActive);
+        }
+    }
+
+    private static CronTrigger queryLatestScheduledJob(String jobNamePrefix) {
+        String jobPattern = jobNamePrefix + '%';
         List<CronTrigger> jobs = [
-            SELECT Id, NextFireTime, OwnerId FROM CronTrigger
+            SELECT Id, CronExpression, NextFireTime, OwnerId FROM CronTrigger
             WHERE CronJobDetail.Name LIKE :jobPattern AND State IN ('WAITING', 'ACQUIRED', 'EXECUTING')
             WITH SYSTEM_MODE ORDER BY CreatedDate DESC LIMIT 1
         ];
-        if (jobs.isEmpty()) {
-            status.isScheduled = false;
-            status.isScheduleOwnerActive = true;
-            return;
+        return jobs.isEmpty() ? null : jobs[0];
+    }
+
+    private static User queryUserById(Id userId) {
+        if (userId == null) {
+            return null;
         }
-        status.isScheduled = true;
-        status.nextFireTime = jobs[0].NextFireTime;
-        List<User> owners = [SELECT Username, IsActive FROM User WHERE Id = :jobs[0].OwnerId WITH SYSTEM_MODE LIMIT 1];
-        status.scheduleOwnerUsername = owners.isEmpty() ? null : owners[0].Username;
-        status.isScheduleOwnerActive = !owners.isEmpty() && owners[0].IsActive;
+        List<User> users = [SELECT Username, IsActive FROM User WHERE Id = :userId WITH SYSTEM_MODE LIMIT 1];
+        return users.isEmpty() ? null : users[0];
+    }
+
+    private static Integer parseCronHour(String cronExpression, Integer fallbackHour) {
+        if (String.isBlank(cronExpression)) {
+            return fallbackHour;
+        }
+        List<String> parts = cronExpression.trim().split('\\s+');
+        if (parts.size() >= 3 && parts[2].isNumeric()) {
+            Integer parsed = Integer.valueOf(parts[2]);
+            if (parsed >= 0 && parsed <= 23) {
+                return parsed;
+            }
+        }
+        return fallbackHour;
     }
 
     private static List<JobSummaryDTO> queryRecentJobs() {
@@ -339,7 +414,10 @@ public with sharing class AuditrController {
 
         if (status.isScheduled && !status.isScheduleOwnerActive) {
             status.isStaleSync = true;
-            status.healthWarning = 'Scheduled job owner (' + status.scheduleOwnerUsername + ') is inactive. Reschedule Daily Sync.';
+            status.healthWarning = 'Scheduled sync job owner (' + status.scheduleOwnerUsername + ') is inactive. Reschedule Daily Sync.';
+        } else if (status.isPurgeScheduled && !status.isPurgeScheduleOwnerActive) {
+            status.isStaleSync = true;
+            status.healthWarning = 'Scheduled purge job owner (' + status.purgeScheduleOwnerUsername + ') is inactive. Reschedule Daily Purge.';
         } else if (lastSyncFailed) {
             status.isStaleSync = true;
             status.healthWarning = 'The most recent Auditr batch job reported errors. Inspect recent jobs below.';

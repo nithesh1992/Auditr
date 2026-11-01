@@ -42,6 +42,18 @@ jest.mock(
     { virtual: true }
 );
 
+jest.mock(
+    '@salesforce/apex/AuditrController.scheduleDailyPurge',
+    () => ({ default: jest.fn() }),
+    { virtual: true }
+);
+
+jest.mock(
+    '@salesforce/apex/AuditrController.unscheduleDailyPurge',
+    () => ({ default: jest.fn() }),
+    { virtual: true }
+);
+
 const flushPromises = () => Promise.resolve();
 
 describe('c-auditr-control-center', () => {

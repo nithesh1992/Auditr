@@ -7,6 +7,8 @@ import runReclassify from '@salesforce/apex/AuditrController.runReclassify';
 import runPurgeNow from '@salesforce/apex/AuditrController.runPurgeNow';
 import scheduleDailySync from '@salesforce/apex/AuditrController.scheduleDailySync';
 import unscheduleDailySync from '@salesforce/apex/AuditrController.unscheduleDailySync';
+import scheduleDailyPurge from '@salesforce/apex/AuditrController.scheduleDailyPurge';
+import unscheduleDailyPurge from '@salesforce/apex/AuditrController.unscheduleDailyPurge';
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, hour) => ({
     label: `${String(hour).padStart(2, '0')}:00`,
@@ -59,9 +61,15 @@ export default class AuditrControlCenter extends LightningElement {
         unclassifiedEntries: 0,
         lastSyncedOccurredAt: null,
         isScheduled: false,
+        scheduledSyncHour: 2,
         nextFireTime: null,
         scheduleOwnerUsername: null,
         isScheduleOwnerActive: true,
+        isPurgeScheduled: false,
+        scheduledPurgeHour: 3,
+        nextPurgeFireTime: null,
+        purgeScheduleOwnerUsername: null,
+        isPurgeScheduleOwnerActive: true,
         isStaleSync: false,
         healthWarning: null,
         recentJobs: [],
@@ -70,6 +78,7 @@ export default class AuditrControlCenter extends LightningElement {
     };
 
     selectedHour = '2';
+    selectedPurgeHour = '3';
     ruleSearchTerm = '';
     isBusy = false;
     wiredStatusResult;
@@ -83,7 +92,16 @@ export default class AuditrControlCenter extends LightningElement {
     }
 
     get retentionStatusLabel() {
-        return this.status.enablePurge ? `Purge after ${this.status.retentionDays} days` : 'Retain Indefinitely';
+        if (!this.status.enablePurge || !this.status.retentionDays || this.status.retentionDays <= 0) {
+            return 'Retain Indefinitely (Purge Off)';
+        }
+        return this.status.isPurgeScheduled
+            ? `Purge > ${this.status.retentionDays}d (Scheduled)`
+            : `Purge > ${this.status.retentionDays}d (Not Scheduled)`;
+    }
+
+    get showNextPurgeTime() {
+        return Boolean(this.status.enablePurge && this.status.isPurgeScheduled && this.status.nextPurgeFireTime);
     }
 
     get hasUnclassifiedActions() {
@@ -125,8 +143,12 @@ export default class AuditrControlCenter extends LightningElement {
         const { data, error } = result;
         if (data) {
             this.status = { ...data };
-            if (data.preferredSyncHour !== undefined && data.preferredSyncHour !== null) {
-                this.selectedHour = String(data.preferredSyncHour);
+            const syncHour = data.scheduledSyncHour ?? data.preferredSyncHour;
+            if (syncHour !== undefined && syncHour !== null) {
+                this.selectedHour = String(syncHour);
+            }
+            if (data.scheduledPurgeHour !== undefined && data.scheduledPurgeHour !== null) {
+                this.selectedPurgeHour = String(data.scheduledPurgeHour);
             }
         } else if (error) {
             this.showToast('Control Center Error', this.extractError(error), 'error');
@@ -135,6 +157,10 @@ export default class AuditrControlCenter extends LightningElement {
 
     handleHourChange(event) {
         this.selectedHour = event.detail.value;
+    }
+
+    handlePurgeHourChange(event) {
+        this.selectedPurgeHour = event.detail.value;
     }
 
     handleRuleSearchChange(event) {
@@ -203,6 +229,31 @@ export default class AuditrControlCenter extends LightningElement {
             () => unscheduleDailySync(),
             'Daily Sync Unscheduled',
             'Auditr_Daily_Sync schedule has been removed.'
+        );
+    }
+
+    async handleSchedulePurge() {
+        if (!this.status.enablePurge || !this.status.retentionDays || this.status.retentionDays <= 0) {
+            this.showToast(
+                'Purge Disabled',
+                'Enable "Enable Purge" and set "Retention Days" (> 0) in Setup -> Custom Metadata Types -> Auditr Setting before scheduling.',
+                'warning'
+            );
+            return;
+        }
+        const hour = parseInt(this.selectedPurgeHour, 10);
+        await this.executeAdminAction(
+            () => scheduleDailyPurge({ hourOfDay: hour }),
+            'Daily Purge Scheduled',
+            `Auditr_Daily_Purge scheduled for ${String(hour).padStart(2, '0')}:00 daily (retaining ${this.status.retentionDays} days).`
+        );
+    }
+
+    async handleUnschedulePurge() {
+        await this.executeAdminAction(
+            () => unscheduleDailyPurge(),
+            'Daily Purge Unscheduled',
+            'Auditr_Daily_Purge schedule has been removed.'
         );
     }
 

@@ -84,44 +84,92 @@
                     <p class="summary-label">Retention Policy</p>
                     <p class="summary-value">{retentionStatusLabel}</p>
                     <p class="summary-subtext">
-                        Configure in Setup &rarr; Custom Metadata Types
+                        <template lwc:if={showNextPurgeTime}>
+                            Next:&nbsp;
+                            <lightning-formatted-date-time
+                                value={status.nextPurgeFireTime}
+                                month="short"
+                                day="2-digit"
+                                hour="2-digit"
+                                minute="2-digit"
+                            ></lightning-formatted-date-time>
+                            &nbsp;&bull;&nbsp;
+                        </template>
+                        Configure in Setup &rarr; Custom Metadata Types &rarr; Auditr Setting
                     </p>
                 </div>
             </div>
 
-            <!-- Daily Schedule Controls -->
-            <div class="schedule-box">
-                <div class="schedule-hour-picker">
-                    <lightning-combobox
-                        name="scheduleHour"
-                        label="Daily Sync Hour (Org Time Zone)"
-                        value={selectedHour}
-                        options={hourOptions}
-                        onchange={handleHourChange}
-                    ></lightning-combobox>
-                </div>
-                <div class="schedule-actions">
-                    <lightning-button
-                        label="Schedule Daily Sync"
-                        variant="neutral"
-                        icon-name="utility:event"
-                        onclick={handleScheduleSync}
-                        disabled={isBusy}
-                    ></lightning-button>
-                    <template lwc:if={status.isScheduled}>
+            <!-- Daily Schedule Controls (2-Column Grid, Same Row) -->
+            <div class="schedule-grid">
+                <div class="schedule-box schedule-box-sync">
+                    <div class="schedule-hour-picker">
+                        <lightning-combobox
+                            name="scheduleHour"
+                            label="Daily Sync Hour (Org Time Zone)"
+                            value={selectedHour}
+                            options={hourOptions}
+                            onchange={handleHourChange}
+                        ></lightning-combobox>
+                    </div>
+                    <div class="schedule-actions">
                         <lightning-button
-                            label="Unschedule"
-                            variant="destructive-text"
-                            icon-name="utility:clear"
-                            onclick={handleUnscheduleSync}
+                            label="Schedule Daily Sync"
+                            variant="neutral"
+                            icon-name="utility:event"
+                            onclick={handleScheduleSync}
                             disabled={isBusy}
                         ></lightning-button>
-                    </template>
-                    <template lwc:if={status.scheduleOwnerUsername}>
-                        <span class="slds-text-body_small slds-text-color_weak">
-                            Scheduled by: {status.scheduleOwnerUsername}
-                        </span>
-                    </template>
+                        <template lwc:if={status.isScheduled}>
+                            <lightning-button
+                                label="Unschedule"
+                                variant="destructive-text"
+                                icon-name="utility:clear"
+                                onclick={handleUnscheduleSync}
+                                disabled={isBusy}
+                            ></lightning-button>
+                        </template>
+                        <template lwc:if={status.scheduleOwnerUsername}>
+                            <span class="slds-text-body_small slds-text-color_weak">
+                                Scheduled by: {status.scheduleOwnerUsername}
+                            </span>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="schedule-box schedule-box-purge">
+                    <div class="schedule-hour-picker">
+                        <lightning-combobox
+                            name="purgeScheduleHour"
+                            label="Daily Purge Hour (Org Time Zone)"
+                            value={selectedPurgeHour}
+                            options={hourOptions}
+                            onchange={handlePurgeHourChange}
+                        ></lightning-combobox>
+                    </div>
+                    <div class="schedule-actions">
+                        <lightning-button
+                            label="Schedule Daily Purge"
+                            variant="neutral"
+                            icon-name="utility:event"
+                            onclick={handleSchedulePurge}
+                            disabled={isBusy}
+                        ></lightning-button>
+                        <template lwc:if={status.isPurgeScheduled}>
+                            <lightning-button
+                                label="Unschedule"
+                                variant="destructive-text"
+                                icon-name="utility:clear"
+                                onclick={handleUnschedulePurge}
+                                disabled={isBusy}
+                            ></lightning-button>
+                        </template>
+                        <template lwc:if={status.purgeScheduleOwnerUsername}>
+                            <span class="slds-text-body_small slds-text-color_weak">
+                                Scheduled by: {status.purgeScheduleOwnerUsername}
+                            </span>
+                        </template>
+                    </div>
                 </div>
             </div>
         </div>

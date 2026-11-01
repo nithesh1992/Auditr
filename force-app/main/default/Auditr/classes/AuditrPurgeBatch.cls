@@ -1,8 +1,20 @@
 /**
- * @description Opt-in retention purge batch job for Auditr_Entry__c.
+ * @description Opt-in retention purge batch and schedulable job for Auditr_Entry__c.
  * Deletes records older than Retention_Days__c only when Enable_Purge__c is explicitly true.
  */
-public with sharing class AuditrPurgeBatch implements Database.Batchable<SObject> {
+public with sharing class AuditrPurgeBatch implements Database.Batchable<SObject>, Schedulable {
+    /**
+     * @description Scheduled entry point that launches AuditrPurgeBatch when Enable_Purge__c is active and Retention_Days__c > 0.
+     * @param context SchedulableContext provided by the platform.
+     */
+    public void execute(SchedulableContext context) {
+        Auditr_Setting__mdt setting = AuditrUtil.getSetting();
+        if (setting.Enable_Purge__c != true || setting.Retention_Days__c == null || setting.Retention_Days__c <= 0) {
+            return;
+        }
+        Database.executeBatch(new AuditrPurgeBatch(), AuditrUtil.getBatchSize());
+    }
+
     /**
      * @description Queries expired Auditr_Entry__c rows when Enable_Purge__c is true and Retention_Days__c > 0.
      * @param context BatchableContext provided by the platform.
