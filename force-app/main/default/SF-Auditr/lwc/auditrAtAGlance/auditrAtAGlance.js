@@ -45,6 +45,25 @@ const INCIDENT_COLUMNS = [
     { label: 'Display Summary', fieldName: 'displayText', type: 'text', wrapText: true }
 ];
 
+function formatCompactNumber(value) {
+    const num = Number(value) || 0;
+    const abs = Math.abs(num);
+
+    if (abs >= 1000000000) {
+        const formatted = (num / 1000000000).toFixed(1).replace(/\.0$/, '');
+        return `${formatted}B`;
+    }
+    if (abs >= 1000000) {
+        const formatted = (num / 1000000).toFixed(1).replace(/\.0$/, '');
+        return `${formatted}M`;
+    }
+    if (abs >= 10000) {
+        const formatted = (num / 1000).toFixed(1).replace(/\.0$/, '');
+        return `${formatted}K`;
+    }
+    return new Intl.NumberFormat().format(num);
+}
+
 export default class AuditrAtAGlance extends LightningElement {
     selectedWindow = '7';
     windowOptions = WINDOW_OPTIONS;
@@ -83,24 +102,48 @@ export default class AuditrAtAGlance extends LightningElement {
         return (this.metrics.totalEntries || 0) >= TOTAL_COUNT_CAP ? '+' : '';
     }
 
+    get formattedTotalEntries() {
+        return `${formatCompactNumber(this.metrics.totalEntries)}${this.totalEntriesSuffix}`;
+    }
+
     get criticalAndHighSuffix() {
         return (this.metrics.criticalAndHighCount || 0) >= KPI_COUNT_CAP ? '+' : '';
+    }
+
+    get formattedCriticalAndHighCount() {
+        return `${formatCompactNumber(this.metrics.criticalAndHighCount)}${this.criticalAndHighSuffix}`;
     }
 
     get securityAndAccessSuffix() {
         return (this.metrics.securityAndAccessCount || 0) >= KPI_COUNT_CAP ? '+' : '';
     }
 
+    get formattedSecurityAndAccessCount() {
+        return `${formatCompactNumber(this.metrics.securityAndAccessCount)}${this.securityAndAccessSuffix}`;
+    }
+
     get automationAndMetadataSuffix() {
         return (this.metrics.automationAndMetadataCount || 0) >= KPI_COUNT_CAP ? '+' : '';
+    }
+
+    get formattedAutomationAndMetadataCount() {
+        return `${formatCompactNumber(this.metrics.automationAndMetadataCount)}${this.automationAndMetadataSuffix}`;
     }
 
     get impersonatedSuffix() {
         return (this.metrics.impersonatedCount || 0) >= KPI_COUNT_CAP ? '+' : '';
     }
 
+    get formattedImpersonatedCount() {
+        return `${formatCompactNumber(this.metrics.impersonatedCount)}${this.impersonatedSuffix}`;
+    }
+
     get unclassifiedSuffix() {
         return (this.metrics.unclassifiedCount || 0) >= KPI_COUNT_CAP ? '+' : '';
+    }
+
+    get formattedUnclassifiedCount() {
+        return `${formatCompactNumber(this.metrics.unclassifiedCount)}${this.unclassifiedSuffix}`;
     }
 
     get incidentButtonLabel() {

@@ -59,10 +59,10 @@ describe('c-auditr-at-a-glance', () => {
 
         await flushPromises();
 
-        const numbers = element.shadowRoot.querySelectorAll('lightning-formatted-number');
-        expect(numbers.length).toBe(6);
-        expect(numbers[0].value).toBe(42);
-        expect(numbers[1].value).toBe(7);
+        const kpiValues = element.shadowRoot.querySelectorAll('.kpi-value');
+        expect(kpiValues.length).toBe(6);
+        expect(kpiValues[0].textContent.trim()).toBe('42');
+        expect(kpiValues[1].textContent.trim()).toBe('7');
 
         const incidentBtn = element.shadowRoot.querySelector('lightning-button');
         incidentBtn.click();
