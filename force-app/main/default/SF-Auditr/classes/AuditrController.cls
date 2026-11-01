@@ -4,6 +4,11 @@
 public with sharing class AuditrController {
     public static final String SCHEDULED_JOB_NAME = 'Auditr_Daily_Sync';
     private static final Integer STALE_SYNC_HOURS = 36;
+    private static final Integer TOTAL_COUNT_CAP = 25000;
+    private static final Integer KPI_COUNT_CAP = 5000;
+    private static final Integer UNCLASSIFIED_COUNT_CAP = 10000;
+    private static final Integer UNCLASSIFIED_WINDOW_DAYS = 30;
+    private static final Integer RECENT_JOBS_LIMIT = 10;
 
     /** @description Summary KPIs for the Auditr Home At-a-Glance header. */
     public class AtAGlanceDTO {
@@ -87,7 +92,7 @@ public with sharing class AuditrController {
     }
 
     /**
-     * @description Returns high-level security KPIs for the Auditr Home At-a-Glance LWC.
+     * @description Returns high-level security KPIs for the Auditr Home At-a-Glance LWC with LDV-safe row caps.
      * @param windowDays Number of days to look back (e.g., 1, 7, 30; <= 0 or null for all time).
      * @return AtAGlanceDTO populated with counts and latest watermark.
      */
@@ -96,12 +101,12 @@ public with sharing class AuditrController {
         DateTime sinceDate = (windowDays != null && windowDays > 0) ? System.now().addDays(-windowDays) : DateTime.newInstance(2000, 1, 1);
         String defaultCategory = AuditrUtil.DEFAULT_CATEGORY;
         AtAGlanceDTO metrics = new AtAGlanceDTO();
-        metrics.totalEntries = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate WITH USER_MODE];
-        metrics.criticalAndHighCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Risk_Level__c IN ('Critical', 'High') WITH USER_MODE];
-        metrics.securityAndAccessCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Category__c IN ('Security & Access', 'Users & Sessions') WITH USER_MODE];
-        metrics.automationAndMetadataCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Category__c IN ('Code & Automation', 'Data & Schema') WITH USER_MODE];
-        metrics.impersonatedCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Delegate_User__c != NULL WITH USER_MODE];
-        metrics.unclassifiedCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Category__c = :defaultCategory WITH USER_MODE];
+        metrics.totalEntries = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate WITH USER_MODE LIMIT :TOTAL_COUNT_CAP];
+        metrics.criticalAndHighCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Risk_Level__c IN ('Critical', 'High') WITH USER_MODE LIMIT :KPI_COUNT_CAP];
+        metrics.securityAndAccessCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Category__c IN ('Security & Access', 'Users & Sessions') WITH USER_MODE LIMIT :KPI_COUNT_CAP];
+        metrics.automationAndMetadataCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Category__c IN ('Code & Automation', 'Data & Schema') WITH USER_MODE LIMIT :KPI_COUNT_CAP];
+        metrics.impersonatedCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Delegate_User__c != NULL WITH USER_MODE LIMIT :KPI_COUNT_CAP];
+        metrics.unclassifiedCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Category__c = :defaultCategory WITH USER_MODE LIMIT :KPI_COUNT_CAP];
         metrics.lastSyncedOccurredAt = queryLatestOccurredAt();
         return metrics;
     }
@@ -148,13 +153,15 @@ public with sharing class AuditrController {
     }
 
     /**
-     * @description Returns full operational status, schedule health, recent jobs, active rules, and top unclassified actions.
+     * @description Returns full operational status, schedule health, recent jobs, active rules, and top unclassified actions (last 30 days).
      * @return ControlCenterStatusDTO for the Control Center LWC.
      */
     @AuraEnabled(cacheable=true)
     public static ControlCenterStatusDTO getControlCenterStatus() {
         Auditr_Setting__mdt setting = AuditrUtil.getSetting();
         String defaultCategory = AuditrUtil.DEFAULT_CATEGORY;
+        DateTime unclassifiedCutoff = System.now().addDays(-UNCLASSIFIED_WINDOW_DAYS);
+
         ControlCenterStatusDTO status = new ControlCenterStatusDTO();
         status.isActive = (setting.Is_Active__c == true);
         status.backfillDays = Integer.valueOf(setting.Backfill_Days__c ?? AuditrUtil.DEFAULT_BACKFILL_DAYS);
@@ -163,14 +170,18 @@ public with sharing class AuditrController {
         status.retentionDays = Integer.valueOf(setting.Retention_Days__c ?? 0);
         status.preferredSyncHour = Integer.valueOf(setting.Preferred_Sync_Hour__c ?? AuditrUtil.DEFAULT_SYNC_HOUR);
 
-        status.totalEntries = [SELECT COUNT() FROM Auditr_Entry__c WHERE Source__c != NULL WITH USER_MODE];
-        status.unclassifiedEntries = [SELECT COUNT() FROM Auditr_Entry__c WHERE Category__c = :defaultCategory WITH USER_MODE];
+        status.totalEntries = [SELECT COUNT() FROM Auditr_Entry__c WHERE Source__c != NULL WITH USER_MODE LIMIT :TOTAL_COUNT_CAP];
+        status.unclassifiedEntries = [
+            SELECT COUNT() FROM Auditr_Entry__c
+            WHERE CreatedDate >= :unclassifiedCutoff AND Category__c = :defaultCategory
+            WITH USER_MODE LIMIT :UNCLASSIFIED_COUNT_CAP
+        ];
         status.lastSyncedOccurredAt = queryLatestOccurredAt();
 
         populateScheduleStatus(status);
         status.recentJobs = queryRecentJobs();
         status.activeRules = buildActiveRuleSummaries();
-        status.topUnclassifiedActions = queryTopUnclassifiedActions();
+        status.topUnclassifiedActions = queryTopUnclassifiedActions(unclassifiedCutoff, status.unclassifiedEntries);
         evaluateHealthWarning(status);
         return status;
     }
@@ -244,16 +255,24 @@ public with sharing class AuditrController {
     }
 
     private static List<JobSummaryDTO> queryRecentJobs() {
+        Map<Id, ApexClass> auditrClasses = new Map<Id, ApexClass>([
+            SELECT Id, Name FROM ApexClass
+            WHERE Name IN ('AuditrSyncBatch', 'AuditrReclassifyBatch', 'AuditrPurgeBatch')
+            WITH SYSTEM_MODE
+        ]);
         List<JobSummaryDTO> summaries = new List<JobSummaryDTO>();
+        if (auditrClasses.isEmpty()) {
+            return summaries;
+        }
         for (AsyncApexJob job : [
-            SELECT Id, ApexClass.Name, Status, JobItemsProcessed, TotalJobItems, NumberOfErrors, CreatedDate, CompletedDate, ExtendedStatus
+            SELECT Id, ApexClassId, Status, JobItemsProcessed, TotalJobItems, NumberOfErrors, CreatedDate, CompletedDate, ExtendedStatus
             FROM AsyncApexJob
-            WHERE ApexClass.Name IN ('AuditrSyncBatch', 'AuditrReclassifyBatch', 'AuditrPurgeBatch')
-            WITH SYSTEM_MODE ORDER BY CreatedDate DESC LIMIT 8
+            WHERE ApexClassId IN :auditrClasses.keySet() AND JobType = 'BatchApex'
+            WITH SYSTEM_MODE ORDER BY CreatedDate DESC LIMIT :RECENT_JOBS_LIMIT
         ]) {
             JobSummaryDTO dto = new JobSummaryDTO();
             dto.jobId = job.Id;
-            dto.className = job.ApexClass.Name;
+            dto.className = auditrClasses.get(job.ApexClassId)?.Name;
             dto.status = job.Status;
             dto.jobItemsProcessed = job.JobItemsProcessed;
             dto.totalJobItems = job.TotalJobItems;
@@ -283,12 +302,16 @@ public with sharing class AuditrController {
         return rules;
     }
 
-    private static List<UnclassifiedActionDTO> queryTopUnclassifiedActions() {
-        String defaultCategory = AuditrUtil.DEFAULT_CATEGORY;
+    private static List<UnclassifiedActionDTO> queryTopUnclassifiedActions(DateTime cutoffDate, Integer recentUnclassifiedCount) {
         List<UnclassifiedActionDTO> actions = new List<UnclassifiedActionDTO>();
+        if (recentUnclassifiedCount == null || recentUnclassifiedCount == 0 || recentUnclassifiedCount >= UNCLASSIFIED_COUNT_CAP) {
+            return actions;
+        }
+        String defaultCategory = AuditrUtil.DEFAULT_CATEGORY;
         for (AggregateResult row : [
             SELECT Action_Code__c actionCode, Section__c sectionName, COUNT(Id) entryCount
-            FROM Auditr_Entry__c WHERE Category__c = :defaultCategory
+            FROM Auditr_Entry__c
+            WHERE CreatedDate >= :cutoffDate AND Category__c = :defaultCategory
             WITH USER_MODE GROUP BY Action_Code__c, Section__c ORDER BY COUNT(Id) DESC LIMIT 10
         ]) {
             UnclassifiedActionDTO dto = new UnclassifiedActionDTO();

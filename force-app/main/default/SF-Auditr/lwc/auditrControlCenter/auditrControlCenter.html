@@ -156,7 +156,7 @@
 
         <!-- Left Column: Top Unclassified Actions -->
         <div class="slds-col slds-size_1-of-1 slds-large-size_5-of-12 slds-m-bottom_small">
-            <lightning-card title="Top Unclassified Setup Actions" icon-name="standard:task2">
+            <lightning-card title="Top Unclassified Setup Actions (Last 30 Days)" icon-name="standard:task2">
                 <div class="slds-p-horizontal_medium slds-p-bottom_medium">
                     <template lwc:if={hasUnclassifiedActions}>
                         <lightning-datatable
@@ -168,7 +168,7 @@
                     </template>
                     <template lwc:else>
                         <p class="slds-text-body_small slds-text-color_weak">
-                            All ingested audit entries match an active classification rule.
+                            No unclassified setup actions in the last 30 days.
                         </p>
                     </template>
                 </div>
@@ -177,7 +177,7 @@
 
         <!-- Right Column: Recent AsyncApexJob Executions -->
         <div class="slds-col slds-size_1-of-1 slds-large-size_7-of-12 slds-m-bottom_small">
-            <lightning-card title="Recent Batch Jobs" icon-name="standard:process">
+            <lightning-card title="Recent Batch Jobs (Last 10)" icon-name="standard:process">
                 <div class="slds-p-horizontal_medium slds-p-bottom_medium">
                     <template lwc:if={hasRecentJobs}>
                         <lightning-datatable
