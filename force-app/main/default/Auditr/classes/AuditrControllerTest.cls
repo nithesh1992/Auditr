@@ -51,6 +51,7 @@ private class AuditrControllerTest {
         AuditrController.ControlCenterStatusDTO scheduledStatus;
         Id syncJobId;
         Id reclassifyJobId;
+        Id purgeJobId;
 
         System.runAs(new User(Id = UserInfo.getUserId())) {
             Test.startTest();
@@ -59,6 +60,7 @@ private class AuditrControllerTest {
             AuditrController.unscheduleDailySync();
             syncJobId = AuditrController.runSyncNow();
             reclassifyJobId = AuditrController.runReclassify(true);
+            purgeJobId = AuditrController.runPurgeNow();
             Test.stopTest();
         }
 
@@ -66,5 +68,6 @@ private class AuditrControllerTest {
         Assert.isTrue(scheduledStatus.isScheduled, 'Control Center status should reflect active schedule');
         Assert.isNotNull(syncJobId, 'runSyncNow should return a batch job Id');
         Assert.isNotNull(reclassifyJobId, 'runReclassify should return a batch job Id');
+        Assert.isNotNull(purgeJobId, 'runPurgeNow should return a batch job Id');
     }
 }

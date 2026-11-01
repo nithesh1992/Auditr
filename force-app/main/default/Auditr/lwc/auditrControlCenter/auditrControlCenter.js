@@ -4,6 +4,7 @@ import { refreshApex } from '@salesforce/apex';
 import getControlCenterStatus from '@salesforce/apex/AuditrController.getControlCenterStatus';
 import runSyncNow from '@salesforce/apex/AuditrController.runSyncNow';
 import runReclassify from '@salesforce/apex/AuditrController.runReclassify';
+import runPurgeNow from '@salesforce/apex/AuditrController.runPurgeNow';
 import scheduleDailySync from '@salesforce/apex/AuditrController.scheduleDailySync';
 import unscheduleDailySync from '@salesforce/apex/AuditrController.unscheduleDailySync';
 
@@ -167,6 +168,24 @@ export default class AuditrControlCenter extends LightningElement {
             () => runReclassify({ onlyUnclassified: false }),
             'Full Reclassification Queued',
             'AuditrReclassifyBatch queued across all stored Auditr entries.'
+        );
+    }
+
+    async handlePurgeNow() {
+        if (!this.status.enablePurge) {
+            this.showToast(
+                'Purge Disabled',
+                'Retention purging is disabled (Enable_Purge__c = false). Enable it in Setup -> Custom Metadata Types -> Auditr Setting to purge expired records.',
+                'warning'
+            );
+            return;
+        }
+
+        const retentionDays = this.status.retentionDays || 0;
+        await this.executeAdminAction(
+            () => runPurgeNow(),
+            'Retention Purge Queued',
+            `AuditrPurgeBatch queued to delete records older than ${retentionDays} days.`
         );
     }
 

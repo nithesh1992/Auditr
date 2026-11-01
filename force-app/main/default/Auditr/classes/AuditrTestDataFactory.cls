@@ -1,5 +1,5 @@
 /**
- * @description Test data factory for SF-Auditr unit and bulk tests.
+ * @description Test data factory for Auditr unit and bulk tests.
  */
 @IsTest
 public with sharing class AuditrTestDataFactory {

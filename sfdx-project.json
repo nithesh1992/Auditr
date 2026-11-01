@@ -17,5 +17,7 @@
   "namespace": "",
   "sfdcLoginUrl": "https://login.salesforce.com",
   "sourceApiVersion": "68.0",
-  "packageAliases": {}
+  "packageAliases": {
+    "Auditr": "0Hog70000004uYHCAY"
+  }
 }

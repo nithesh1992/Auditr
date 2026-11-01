@@ -1,5 +1,5 @@
 /**
- * @description AuraEnabled controller backing the SF-Auditr At-a-Glance Home LWC and Control Center LWC.
+ * @description AuraEnabled controller backing the Auditr At-a-Glance Home LWC and Control Center LWC.
  */
 public with sharing class AuditrController {
     public static final String SCHEDULED_JOB_NAME = 'Auditr_Daily_Sync';
@@ -205,6 +205,15 @@ public with sharing class AuditrController {
     @SuppressWarnings('PMD.AvoidBooleanMethodParameters')
     public static Id runReclassify(Boolean onlyUnclassified) {
         return Database.executeBatch(new AuditrReclassifyBatch(onlyUnclassified != false), AuditrUtil.getBatchSize());
+    }
+
+    /**
+     * @description Executes AuditrPurgeBatch to delete expired audit records based on Auditr_Setting__mdt.
+     * @return AsyncApexJob Id of the queued purge batch.
+     */
+    @AuraEnabled
+    public static Id runPurgeNow() {
+        return Database.executeBatch(new AuditrPurgeBatch(), AuditrUtil.getBatchSize());
     }
 
     /**

@@ -21,8 +21,24 @@
 - **At-a-Glance + Incident Mode (`auditrAtAGlance`).** 6-KPI rolling summary strip (`Total Events`, `Critical & High`, `Security & Access`, `Automation & Code`, `Impersonated`, `Unclassified`) with reader-friendly compact numbers (`25K`, `1.5M`), window filters (up to 1 year), and an expandable **Incident Mode** investigator to pinpoint changes around an exact incident timestamp.
 - **Custom Read-Only Detail Component (`auditrRecordDetail`).** Enforces immutable audit provenance (Section, Action Code, Responsible Actor, Delegate User, Context, Timestamp, Display) with zero inline editing pencils, while allowing authorized admins to reclassify Risk Level & Category in a dedicated modal.
 - **Field History Tracking.** Built-in field history tracking across all audit entry fields with a dedicated `Histories` tab on the record page.
-- **Control Center (`auditrControlCenter`).** Run **Sync Now**, schedule daily automated sync, trigger **Reclassify Unclassified** or **Reclassify All**, inspect top unclassified setup actions (last 30 days), monitor recent batch runs, and search active classification rules.
+- **Control Center (`auditrControlCenter`).** Run **Sync Now**, schedule daily automated sync, trigger **Reclassify Unclassified** or **Reclassify All**, run **Retention Purge**, inspect top unclassified setup actions (last 30 days), monitor recent batch runs, and search active classification rules.
 - **Reports & Security Dashboard.** 6 pre-built reports and a 6-widget `Auditr_Security_Dashboard` embedded directly on the **Auditr Home** page.
+
+---
+
+## Data Retention & Purge Management
+
+By default, Auditr retains all `Auditr_Entry__c` records indefinitely to ensure compliance with long-term audit and SOC 2 / ISO 27001 requirements. For orgs with strict data lifecycle or storage limits:
+
+- **`Auditr_Setting__mdt.Enable_Purge__c`**: Boolean toggle controlling whether expired records can be purged (default: `false`).
+- **`Auditr_Setting__mdt.Retention_Days__c`**: Retention threshold in days (e.g., `365` or `730`). Records where `Occurred_At__c < (NOW - Retention_Days)` become eligible for deletion.
+- **Controlled Immutability Bypass**: `AuditrEntryTrigger` prevents deletion by any user. Only `AuditrPurgeBatch` can delete expired rows by explicitly setting `AuditrEntryTriggerHandler.allowPurgeDelete = true` within its execution scope.
+- **Manual Execution**: Click **Run Retention Purge** in the Control Center header (safe verification protects against running when `Enable_Purge__c` is false).
+- **Scheduled Purge via Apex**:
+  ```apex
+  // Example: schedule monthly retention cleanup on the 1st of every month at 3 AM
+  System.schedule('Auditr Monthly Purge', '0 0 3 1 * ?', new AuditrPurgeBatch());
+  ```
 
 ---
 

@@ -24,7 +24,7 @@
         <apexClass>AuditrUtil</apexClass>
         <enabled>true</enabled>
     </classAccesses>
-    <description>Grants administrative access to SF-Auditr Control Center operations, SetupAuditTrail ingestion, and read-all access to immutable Auditr Entry records.</description>
+    <description>Grants administrative access to Auditr Control Center operations, SetupAuditTrail ingestion, and read-all access to immutable Auditr Entry records.</description>
     <fieldPermissions>
         <editable>false</editable>
         <field>Auditr_Entry__c.Action_Code__c</field>

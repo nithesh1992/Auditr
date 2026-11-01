@@ -25,6 +25,12 @@ jest.mock(
 );
 
 jest.mock(
+    '@salesforce/apex/AuditrController.runPurgeNow',
+    () => ({ default: jest.fn() }),
+    { virtual: true }
+);
+
+jest.mock(
     '@salesforce/apex/AuditrController.scheduleDailySync',
     () => ({ default: jest.fn() }),
     { virtual: true }

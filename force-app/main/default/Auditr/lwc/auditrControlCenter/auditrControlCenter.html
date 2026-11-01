@@ -26,6 +26,12 @@
                         onclick={handleReclassifyAll}
                         disabled={isBusy}
                     ></lightning-button>
+                    <lightning-button
+                        label="Run Retention Purge"
+                        icon-name="utility:delete"
+                        onclick={handlePurgeNow}
+                        disabled={isBusy}
+                    ></lightning-button>
                     <lightning-button-icon
                         icon-name="utility:refresh"
                         alternative-text="Refresh Control Center"

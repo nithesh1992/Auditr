@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>68.0</apiVersion>
-    <description>Administrative Control Center for SF-Auditr sync operations, daily scheduling, reclassification, unclassified action discovery, and rule inspection.</description>
+    <description>Administrative Control Center for Auditr sync operations, daily scheduling, reclassification, unclassified action discovery, and rule inspection.</description>
     <isExposed>true</isExposed>
     <masterLabel>Auditr Control Center</masterLabel>
     <targets>
