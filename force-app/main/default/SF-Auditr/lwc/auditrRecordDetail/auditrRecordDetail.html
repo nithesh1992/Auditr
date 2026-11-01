@@ -6,11 +6,11 @@
                     label="Cancel"
                     onclick={handleCancelClassification}
                     disabled={isSaving}
-                    class="slds-m-right_x-small">
+                    class="slds-m-right_xx-small">
                 </lightning-button>
                 <lightning-button
                     variant="brand"
-                    label="Save Classification"
+                    label="Save"
                     onclick={handleSaveClassification}
                     disabled={isSaving}>
                 </lightning-button>
@@ -24,22 +24,18 @@
             </template>
         </div>
 
-        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
-            <!-- Editable Classification Section (Risk Level & Category ONLY) -->
-            <div class="slds-box slds-theme_shade slds-m-bottom_medium">
-                <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-m-bottom_x-small">
-                    <h3 class="slds-text-title_caps slds-text-color_weak">Classification (Editable)</h3>
-                    <span class="slds-badge slds-theme_info">Field History Tracked</span>
-                </div>
-
+        <div class="slds-p-horizontal_small slds-p-bottom_x-small">
+            <!-- Compact Editable Classification Bar (Risk Level & Category ONLY) -->
+            <div class="slds-box slds-box_x-small slds-theme_shade slds-m-bottom_x-small">
                 <template lwc:if={isEditingClassification}>
                     <lightning-record-edit-form
                         record-id={recordId}
                         object-api-name="Auditr_Entry__c"
+                        density="compact"
                         onsuccess={handleClassificationSuccess}
                         onerror={handleClassificationError}>
                         <lightning-messages></lightning-messages>
-                        <div class="slds-grid slds-wrap slds-gutters_small">
+                        <div class="slds-grid slds-wrap slds-gutters_x-small">
                             <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
                                 <lightning-input-field field-name="Risk_Level__c" required></lightning-input-field>
                             </div>
@@ -52,8 +48,11 @@
                 </template>
 
                 <template lwc:else>
-                    <lightning-record-view-form record-id={recordId} object-api-name="Auditr_Entry__c">
-                        <div class="slds-grid slds-wrap slds-gutters_small">
+                    <lightning-record-view-form
+                        record-id={recordId}
+                        object-api-name="Auditr_Entry__c"
+                        density="compact">
+                        <div class="slds-grid slds-wrap slds-gutters_x-small">
                             <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
                                 <lightning-output-field field-name="Risk_Level__c"></lightning-output-field>
                             </div>
@@ -65,22 +64,22 @@
                 </template>
             </div>
 
-            <!-- Strictly Read-Only Audit Event & Provenance Fields -->
-            <lightning-record-view-form record-id={recordId} object-api-name="Auditr_Entry__c">
-                <h3 class="slds-section__title slds-theme_shade slds-p-horizontal_small slds-m-bottom_small">
-                    <span class="slds-truncate" title="Immutable Audit Evidence">Immutable Audit Evidence</span>
+            <!-- Compact Read-Only Audit Event & Provenance Fields -->
+            <lightning-record-view-form
+                record-id={recordId}
+                object-api-name="Auditr_Entry__c"
+                density="compact">
+                <h3 class="slds-section__title slds-theme_shade slds-p-horizontal_x-small slds-m-bottom_xx-small">
+                    <span class="slds-truncate slds-text-title_caps" title="Audit Evidence">Audit Evidence</span>
                 </h3>
-                <div class="slds-grid slds-wrap slds-gutters_small slds-m-bottom_medium">
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-output-field field-name="Name"></lightning-output-field>
-                    </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                <div class="slds-grid slds-wrap slds-gutters_x-small slds-m-bottom_x-small">
+                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
                         <lightning-output-field field-name="Occurred_At__c"></lightning-output-field>
                     </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
                         <lightning-output-field field-name="Section__c"></lightning-output-field>
                     </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
                         <lightning-output-field field-name="Action_Code__c"></lightning-output-field>
                     </div>
                     <div class="slds-col slds-size_1-of-1">
@@ -88,10 +87,10 @@
                     </div>
                 </div>
 
-                <h3 class="slds-section__title slds-theme_shade slds-p-horizontal_small slds-m-bottom_small">
-                    <span class="slds-truncate" title="Actor &amp; Source Provenance">Actor &amp; Source Provenance</span>
+                <h3 class="slds-section__title slds-theme_shade slds-p-horizontal_x-small slds-m-bottom_xx-small">
+                    <span class="slds-truncate slds-text-title_caps" title="Actor &amp; Source Provenance">Actor &amp; Source Provenance</span>
                 </h3>
-                <div class="slds-grid slds-wrap slds-gutters_small">
+                <div class="slds-grid slds-wrap slds-gutters_x-small">
                     <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
                         <lightning-output-field field-name="Responsible_Username__c"></lightning-output-field>
                     </div>

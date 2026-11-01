@@ -16,7 +16,7 @@ describe('c-auditr-record-detail', () => {
         document.body.appendChild(element);
 
         const outputFields = element.shadowRoot.querySelectorAll('lightning-output-field');
-        expect(outputFields.length).toBe(15);
+        expect(outputFields.length).toBe(14);
         expect(element.shadowRoot.querySelectorAll('lightning-input-field').length).toBe(0);
 
         const editButton = element.shadowRoot.querySelector('lightning-button');
