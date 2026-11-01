@@ -44,13 +44,26 @@ By default, Auditr retains all `Auditr_Entry__c` records indefinitely to ensure 
 
 ## Install & Set Up
 
-### 1. Deploy from source
+### 1. Install Unlocked Package (Recommended)
+
+Install the latest unlocked package build (`v1.0.0-2`) in any sandbox, scratch org, or production environment:
+
+```bash
+sf package install --package 04tg7000000cCJVAA2 --target-org <alias> --wait 10
+```
+
+*Or install directly via your browser:*  
+`https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cCJVAA2`
+
+---
+
+### 2. Or Deploy from Source
 
 ```bash
 sf project deploy start --source-dir force-app/main/default/Auditr --target-org <alias>
 ```
 
-### 2. Assign permission sets
+### 3. Assign Permission Sets
 
 - **`Auditr_Admin`** — Full access to the Auditr app, Control Center operations, Setup Audit Trail sync/reclassification, and read-all access to `Auditr_Entry__c`.
 - **`Auditr_Viewer`** — Read-only auditor access to `Auditr_Entry__c`, Auditr Home, Incident Mode, reports, and dashboards.
@@ -59,7 +72,7 @@ sf project deploy start --source-dir force-app/main/default/Auditr --target-org 
 sf org assign permset --name Auditr_Admin --target-org <alias>
 ```
 
-### 3. Run initial sync & schedule daily sync
+### 4. Run Initial Sync & Schedule Daily Sync
 
 Open the **Auditr** app from the Lightning App Launcher → **Auditr Control Center** → click **Sync Now** and **Schedule Daily**, or run via Apex:
 

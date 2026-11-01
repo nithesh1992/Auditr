@@ -18,6 +18,8 @@
   "sfdcLoginUrl": "https://login.salesforce.com",
   "sourceApiVersion": "68.0",
   "packageAliases": {
-    "Auditr": "0Hog70000004uYHCAY"
+    "Auditr": "0Hog70000004uYHCAY",
+    "Auditr@1.0.0-1": "04tg7000000cCHtAAM",
+    "Auditr@1.0.0-2": "04tg7000000cCJVAA2"
   }
 }
