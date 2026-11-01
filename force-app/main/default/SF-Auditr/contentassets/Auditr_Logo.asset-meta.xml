@@ -10,8 +10,8 @@
     </relationships>
     <versions>
         <version>
-            <number>1</number>
-            <pathOnClient>auditr-icon.png</pathOnClient>
+            <number>2</number>
+            <pathOnClient>auditr-logo.png</pathOnClient>
         </version>
     </versions>
 </ContentAsset>

@@ -12,7 +12,7 @@
     <brand>
         <headerColor>#10B981</headerColor>
         <logo>Auditr_Logo</logo>
-        <logoVersion>1</logoVersion>
+        <logoVersion>2</logoVersion>
         <shouldOverrideOrgTheme>false</shouldOverrideOrgTheme>
     </brand>
     <description>Tamper-resistant Salesforce Setup Audit Trail intelligence, classification, and security monitoring.</description>
