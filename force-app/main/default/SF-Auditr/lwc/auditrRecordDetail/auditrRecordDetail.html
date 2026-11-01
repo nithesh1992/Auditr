@@ -1,14 +1,8 @@
 <template>
     <div class="detail-card">
-        <!-- Compact Header Strip: Risk Badge, Category, Section, Action Code + Edit Action -->
+        <!-- Minimal Header + Reclassify Toggle -->
         <div class="top-bar">
-            <div class="badges-row">
-                <span class={riskBadgeClass}>{riskLevel}</span>
-                <span class="category-pill">{category}</span>
-                <span class="code-chip" title="Setup Section">{section}</span>
-                <span class="code-chip" title="Setup Action Code">{actionCode}</span>
-            </div>
-
+            <span class="card-title">Audit Event Details</span>
             <div>
                 <template lwc:if={isEditingClassification}>
                     <lightning-button
@@ -62,8 +56,16 @@
             {displayText}
         </div>
 
-        <!-- Compact 4-Column Read-Only Provenance Grid -->
+        <!-- Compact 2-Row Read-Only Metadata Grid (10 Fields) -->
         <div class="meta-grid">
+            <div class="meta-item">
+                <div class="meta-label">Section</div>
+                <div class="meta-value" title={section}>{section}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Action Code</div>
+                <div class="meta-value mono" title={actionCode}>{actionCode}</div>
+            </div>
             <div class="meta-item">
                 <div class="meta-label">Occurred At</div>
                 <div class="meta-value">

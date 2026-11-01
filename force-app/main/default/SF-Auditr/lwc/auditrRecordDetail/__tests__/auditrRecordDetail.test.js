@@ -15,7 +15,7 @@ describe('c-auditr-record-detail', () => {
         element.recordId = 'a00000000000001AAA';
         document.body.appendChild(element);
 
-        expect(element.shadowRoot.querySelectorAll('.meta-item').length).toBe(8);
+        expect(element.shadowRoot.querySelectorAll('.meta-item').length).toBe(10);
         expect(element.shadowRoot.querySelectorAll('lightning-input-field').length).toBe(0);
 
         const editButton = element.shadowRoot.querySelector('lightning-button');

@@ -2,8 +2,6 @@ import { LightningElement, api, wire } from 'lwc';
 import { getRecord, getFieldValue, notifyRecordUpdateAvailable } from 'lightning/uiRecordApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
-import RISK_LEVEL_FIELD from '@salesforce/schema/Auditr_Entry__c.Risk_Level__c';
-import CATEGORY_FIELD from '@salesforce/schema/Auditr_Entry__c.Category__c';
 import SECTION_FIELD from '@salesforce/schema/Auditr_Entry__c.Section__c';
 import ACTION_CODE_FIELD from '@salesforce/schema/Auditr_Entry__c.Action_Code__c';
 import DISPLAY_FIELD from '@salesforce/schema/Auditr_Entry__c.Display__c';
@@ -17,8 +15,6 @@ import SOURCE_FIELD from '@salesforce/schema/Auditr_Entry__c.Source__c';
 import SOURCE_RECORD_ID_FIELD from '@salesforce/schema/Auditr_Entry__c.Source_Record_Id__c';
 
 const FIELDS = [
-    RISK_LEVEL_FIELD,
-    CATEGORY_FIELD,
     SECTION_FIELD,
     ACTION_CODE_FIELD,
     DISPLAY_FIELD,
@@ -40,22 +36,6 @@ export default class AuditrRecordDetail extends LightningElement {
 
     isEditingClassification = false;
     isSaving = false;
-
-    get riskLevel() {
-        return getFieldValue(this.entryRecord?.data, RISK_LEVEL_FIELD) || 'Low';
-    }
-
-    get riskBadgeClass() {
-        const level = this.riskLevel.toLowerCase();
-        if (level === 'critical') return 'risk-badge risk-critical';
-        if (level === 'high') return 'risk-badge risk-high';
-        if (level === 'medium') return 'risk-badge risk-medium';
-        return 'risk-badge risk-low';
-    }
-
-    get category() {
-        return getFieldValue(this.entryRecord?.data, CATEGORY_FIELD) || 'Unclassified';
-    }
 
     get section() {
         return getFieldValue(this.entryRecord?.data, SECTION_FIELD) || 'General';
