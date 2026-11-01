@@ -87,12 +87,12 @@
     <flexiPageRegions>
         <itemInstances>
             <componentInstance>
-                <componentName>c:auditrRecordDetail</componentName>
+                <componentName>auditrRecordDetail</componentName>
                 <identifier>c_auditrRecordDetail</identifier>
             </componentInstance>
         </itemInstances>
-        <name>main</name>
-        <type>Region</type>
+        <name>Facet-53777918-eec2-4c73-9ec8-e98de1660664</name>
+        <type>Facet</type>
     </flexiPageRegions>
     <flexiPageRegions>
         <itemInstances>
@@ -121,6 +121,68 @@
                 <identifier>force_relatedListSingleContainer_histories</identifier>
             </componentInstance>
         </itemInstances>
+        <name>Facet-b62525a5-fc3b-4d06-98ee-2850dac02680</name>
+        <type>Facet</type>
+    </flexiPageRegions>
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
+                    <name>active</name>
+                    <value>true</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>body</name>
+                    <value>Facet-53777918-eec2-4c73-9ec8-e98de1660664</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>title</name>
+                    <value>Standard.Tab.detail</value>
+                </componentInstanceProperties>
+                <componentName>flexipage:tab</componentName>
+                <identifier>flexipage_tab2</identifier>
+            </componentInstance>
+        </itemInstances>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
+                    <name>active</name>
+                    <value>false</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>body</name>
+                    <value>Facet-b62525a5-fc3b-4d06-98ee-2850dac02680</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>title</name>
+                    <value>Standard.Tab.relatedLists</value>
+                </componentInstanceProperties>
+                <componentName>flexipage:tab</componentName>
+                <identifier>flexipage_tab</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>Facet-25cb245c-3269-45f0-87c9-28a1a9eac22b</name>
+        <type>Facet</type>
+    </flexiPageRegions>
+    <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentInstanceProperties>
+                    <name>label</name>
+                    <value>Tabs</value>
+                </componentInstanceProperties>
+                <componentInstanceProperties>
+                    <name>tabs</name>
+                    <value>Facet-25cb245c-3269-45f0-87c9-28a1a9eac22b</value>
+                </componentInstanceProperties>
+                <componentName>flexipage:tabset</componentName>
+                <identifier>flexipage_tabset</identifier>
+            </componentInstance>
+        </itemInstances>
+        <name>main</name>
+        <type>Region</type>
+    </flexiPageRegions>
+    <flexiPageRegions>
         <name>sidebar</name>
         <type>Region</type>
     </flexiPageRegions>
