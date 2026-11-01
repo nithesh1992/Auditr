@@ -1,122 +1,111 @@
 <template>
-    <lightning-card title="Setup Audit Event Details" icon-name="standard:entitlement">
-        <div slot="actions">
-            <template lwc:if={isEditingClassification}>
-                <lightning-button
-                    label="Cancel"
-                    onclick={handleCancelClassification}
-                    disabled={isSaving}
-                    class="slds-m-right_xx-small">
-                </lightning-button>
-                <lightning-button
-                    variant="brand"
-                    label="Save"
-                    onclick={handleSaveClassification}
-                    disabled={isSaving}>
-                </lightning-button>
-            </template>
-            <template lwc:else>
-                <lightning-button
-                    label="Edit Classification"
-                    icon-name="utility:edit"
-                    onclick={handleEditClassification}>
-                </lightning-button>
-            </template>
-        </div>
-
-        <div class="slds-p-horizontal_small slds-p-bottom_x-small">
-            <!-- Compact Editable Classification Bar (Risk Level & Category ONLY) -->
-            <div class="slds-box slds-box_x-small slds-theme_shade slds-m-bottom_x-small">
-                <template lwc:if={isEditingClassification}>
-                    <lightning-record-edit-form
-                        record-id={recordId}
-                        object-api-name="Auditr_Entry__c"
-                        density="compact"
-                        onsuccess={handleClassificationSuccess}
-                        onerror={handleClassificationError}>
-                        <lightning-messages></lightning-messages>
-                        <div class="slds-grid slds-wrap slds-gutters_x-small">
-                            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                                <lightning-input-field field-name="Risk_Level__c" required></lightning-input-field>
-                            </div>
-                            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                                <lightning-input-field field-name="Category__c" required></lightning-input-field>
-                            </div>
-                        </div>
-                        <button type="submit" class="slds-hide" data-id="hiddenSubmitBtn">Submit</button>
-                    </lightning-record-edit-form>
-                </template>
-
-                <template lwc:else>
-                    <lightning-record-view-form
-                        record-id={recordId}
-                        object-api-name="Auditr_Entry__c"
-                        density="compact">
-                        <div class="slds-grid slds-wrap slds-gutters_x-small">
-                            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                                <lightning-output-field field-name="Risk_Level__c"></lightning-output-field>
-                            </div>
-                            <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                                <lightning-output-field field-name="Category__c"></lightning-output-field>
-                            </div>
-                        </div>
-                    </lightning-record-view-form>
-                </template>
+    <div class="detail-card">
+        <!-- Compact Header Strip: Risk Badge, Category, Section, Action Code + Edit Action -->
+        <div class="top-bar">
+            <div class="badges-row">
+                <span class={riskBadgeClass}>{riskLevel}</span>
+                <span class="category-pill">{category}</span>
+                <span class="code-chip" title="Setup Section">{section}</span>
+                <span class="code-chip" title="Setup Action Code">{actionCode}</span>
             </div>
 
-            <!-- Compact Read-Only Audit Event & Provenance Fields -->
-            <lightning-record-view-form
-                record-id={recordId}
-                object-api-name="Auditr_Entry__c"
-                density="compact">
-                <h3 class="slds-section__title slds-theme_shade slds-p-horizontal_x-small slds-m-bottom_xx-small">
-                    <span class="slds-truncate slds-text-title_caps" title="Audit Evidence">Audit Evidence</span>
-                </h3>
-                <div class="slds-grid slds-wrap slds-gutters_x-small slds-m-bottom_x-small">
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
-                        <lightning-output-field field-name="Occurred_At__c"></lightning-output-field>
-                    </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
-                        <lightning-output-field field-name="Section__c"></lightning-output-field>
-                    </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-3">
-                        <lightning-output-field field-name="Action_Code__c"></lightning-output-field>
-                    </div>
-                    <div class="slds-col slds-size_1-of-1">
-                        <lightning-output-field field-name="Display__c"></lightning-output-field>
-                    </div>
-                </div>
-
-                <h3 class="slds-section__title slds-theme_shade slds-p-horizontal_x-small slds-m-bottom_xx-small">
-                    <span class="slds-truncate slds-text-title_caps" title="Actor &amp; Source Provenance">Actor &amp; Source Provenance</span>
-                </h3>
-                <div class="slds-grid slds-wrap slds-gutters_x-small">
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-output-field field-name="Responsible_Username__c"></lightning-output-field>
-                    </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-output-field field-name="Delegate_User__c"></lightning-output-field>
-                    </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-output-field field-name="Actor__c"></lightning-output-field>
-                    </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-output-field field-name="Actor_Username__c"></lightning-output-field>
-                    </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-output-field field-name="Actor_Context__c"></lightning-output-field>
-                    </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-output-field field-name="Namespace_Prefix__c"></lightning-output-field>
-                    </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-output-field field-name="Source__c"></lightning-output-field>
-                    </div>
-                    <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
-                        <lightning-output-field field-name="Source_Record_Id__c"></lightning-output-field>
-                    </div>
-                </div>
-            </lightning-record-view-form>
+            <div>
+                <template lwc:if={isEditingClassification}>
+                    <lightning-button
+                        label="Cancel"
+                        onclick={handleCancelClassification}
+                        disabled={isSaving}
+                        class="slds-m-right_xx-small">
+                    </lightning-button>
+                    <lightning-button
+                        variant="brand"
+                        label="Save"
+                        onclick={handleSaveClassification}
+                        disabled={isSaving}>
+                    </lightning-button>
+                </template>
+                <template lwc:else>
+                    <lightning-button
+                        label="Reclassify"
+                        icon-name="utility:edit"
+                        onclick={handleEditClassification}>
+                    </lightning-button>
+                </template>
+            </div>
         </div>
-    </lightning-card>
+
+        <!-- Inline Classification Editor (Shown Only When Reclassifying) -->
+        <template lwc:if={isEditingClassification}>
+            <div class="edit-box">
+                <lightning-record-edit-form
+                    record-id={recordId}
+                    object-api-name="Auditr_Entry__c"
+                    density="compact"
+                    onsuccess={handleClassificationSuccess}
+                    onerror={handleClassificationError}>
+                    <lightning-messages></lightning-messages>
+                    <div class="slds-grid slds-wrap slds-gutters_x-small">
+                        <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                            <lightning-input-field field-name="Risk_Level__c" required></lightning-input-field>
+                        </div>
+                        <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
+                            <lightning-input-field field-name="Category__c" required></lightning-input-field>
+                        </div>
+                    </div>
+                    <button type="submit" class="slds-hide" data-id="hiddenSubmitBtn">Submit</button>
+                </lightning-record-edit-form>
+            </div>
+        </template>
+
+        <!-- Audit Trail Change Description -->
+        <div class="display-box" title="SetupAuditTrail Display">
+            {displayText}
+        </div>
+
+        <!-- Compact 4-Column Read-Only Provenance Grid -->
+        <div class="meta-grid">
+            <div class="meta-item">
+                <div class="meta-label">Occurred At</div>
+                <div class="meta-value">
+                    <lightning-formatted-date-time
+                        value={occurredAt}
+                        year="numeric"
+                        month="short"
+                        day="2-digit"
+                        hour="2-digit"
+                        minute="2-digit"
+                        second="2-digit">
+                    </lightning-formatted-date-time>
+                </div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Responsible Actor</div>
+                <div class="meta-value" title={responsibleUsername}>{responsibleUsername}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Acted As</div>
+                <div class="meta-value" title={actorUsername}>{actorUsername}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Delegate User</div>
+                <div class="meta-value" title={delegateUser}>{delegateUser}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Actor Context</div>
+                <div class="meta-value" title={actorContext}>{actorContext}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Namespace</div>
+                <div class="meta-value mono" title={namespacePrefix}>{namespacePrefix}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Source</div>
+                <div class="meta-value">{source}</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-label">Source Record ID</div>
+                <div class="meta-value mono" title={sourceRecordId}>{sourceRecordId}</div>
+            </div>
+        </div>
+    </div>
 </template>

@@ -8,22 +8,20 @@ describe('c-auditr-record-detail', () => {
         }
     });
 
-    it('renders read-only output fields by default and toggles classification edit mode', async () => {
+    it('renders compact read-only metadata grid by default and toggles reclassify form', async () => {
         const element = createElement('c-auditr-record-detail', {
             is: AuditrRecordDetail
         });
         element.recordId = 'a00000000000001AAA';
         document.body.appendChild(element);
 
-        const outputFields = element.shadowRoot.querySelectorAll('lightning-output-field');
-        expect(outputFields.length).toBe(14);
+        expect(element.shadowRoot.querySelectorAll('.meta-item').length).toBe(8);
         expect(element.shadowRoot.querySelectorAll('lightning-input-field').length).toBe(0);
 
         const editButton = element.shadowRoot.querySelector('lightning-button');
         editButton.click();
         await Promise.resolve();
 
-        const inputFields = element.shadowRoot.querySelectorAll('lightning-input-field');
-        expect(inputFields.length).toBe(2);
+        expect(element.shadowRoot.querySelectorAll('lightning-input-field').length).toBe(2);
     });
 });
