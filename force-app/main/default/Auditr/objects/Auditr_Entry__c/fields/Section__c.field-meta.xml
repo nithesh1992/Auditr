@@ -2,8 +2,8 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Section__c</fullName>
     <description>Setup area from SetupAuditTrail.Section (defaults to General when blank).</description>
-    <inlineHelpText>The Setup menu section where the change occurred (defaults to General when blank on SetupAuditTrail).</inlineHelpText>
     <externalId>false</externalId>
+    <inlineHelpText>The Setup menu section where the change occurred (defaults to General when blank on SetupAuditTrail).</inlineHelpText>
     <label>Section</label>
     <length>80</length>
     <required>false</required>

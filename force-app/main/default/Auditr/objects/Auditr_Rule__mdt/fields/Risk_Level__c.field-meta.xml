@@ -2,8 +2,8 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Risk_Level__c</fullName>
     <description>Deterministic Risk Level assigned to Auditr Entry when this rule matches.</description>
-    <inlineHelpText>Select the Risk Level to assign when an audit entry matches this rule.</inlineHelpText>
     <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Select the Risk Level to assign when an audit entry matches this rule.</inlineHelpText>
     <label>Risk Level</label>
     <required>true</required>
     <type>Picklist</type>

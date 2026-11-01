@@ -20,7 +20,7 @@
     </values>
     <values>
         <field>Match_Value__c</field>
-        <value xsi:type="xsd:string">Custom </value>
+        <value xsi:type="xsd:string">Custom</value>
     </values>
     <values>
         <field>Priority__c</field>

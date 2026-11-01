@@ -3,9 +3,9 @@
     <fullName>Retention_Days__c</fullName>
     <defaultValue>0</defaultValue>
     <description>Number of days to retain Auditr Entry records when Enable Purge is checked (0 keeps records indefinitely).</description>
-    <inlineHelpText>Number of days to retain Auditr Entry records when Enable Purge is checked (0 retains records forever).</inlineHelpText>
     <externalId>false</externalId>
     <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Number of days to retain Auditr Entry records when Enable Purge is checked (0 retains records forever).</inlineHelpText>
     <label>Retention Days</label>
     <precision>5</precision>
     <required>false</required>

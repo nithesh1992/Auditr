@@ -3,9 +3,9 @@
     <fullName>Preferred_Sync_Hour__c</fullName>
     <defaultValue>2</defaultValue>
     <description>Default hour of day (0-23) used when scheduling the daily Auditr sync job.</description>
-    <inlineHelpText>Hour of the day (0-23 in the running user's timezone) for the daily scheduled sync job.</inlineHelpText>
     <externalId>false</externalId>
     <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Hour of the day (0-23 in the running user&apos;s timezone) for the daily scheduled sync job.</inlineHelpText>
     <label>Preferred Sync Hour</label>
     <precision>2</precision>
     <required>true</required>

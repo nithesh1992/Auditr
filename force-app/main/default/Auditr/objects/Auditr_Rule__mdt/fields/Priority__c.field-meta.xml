@@ -2,9 +2,9 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Priority__c</fullName>
     <description>Evaluation order (ascending). The lowest priority number that matches wins.</description>
-    <inlineHelpText>Evaluation order for this rule; lower numbers are evaluated first and the first matching rule wins.</inlineHelpText>
     <externalId>false</externalId>
     <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Evaluation order for this rule; lower numbers are evaluated first and the first matching rule wins.</inlineHelpText>
     <label>Priority</label>
     <precision>5</precision>
     <required>true</required>

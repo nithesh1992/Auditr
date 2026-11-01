@@ -3,8 +3,8 @@
     <fullName>Is_Active__c</fullName>
     <defaultValue>true</defaultValue>
     <description>Master switch controlling whether scheduled Auditr sync jobs execute.</description>
-    <inlineHelpText>Uncheck to pause scheduled Auditr sync executions without deleting the scheduled job.</inlineHelpText>
     <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Uncheck to pause scheduled Auditr sync executions without deleting the scheduled job.</inlineHelpText>
     <label>Is Active</label>
     <type>Checkbox</type>
 </CustomField>

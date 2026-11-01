@@ -3,9 +3,9 @@
     <fullName>Batch_Size__c</fullName>
     <defaultValue>2000</defaultValue>
     <description>Batch chunk size for AuditrSyncBatch and AuditrPurgeBatch execution.</description>
-    <inlineHelpText>Number of records processed per batch chunk in AuditrSyncBatch and AuditrPurgeBatch (1 to 2000).</inlineHelpText>
     <externalId>false</externalId>
     <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Number of records processed per batch chunk in AuditrSyncBatch and AuditrPurgeBatch (1 to 2000).</inlineHelpText>
     <label>Batch Size</label>
     <precision>4</precision>
     <required>true</required>

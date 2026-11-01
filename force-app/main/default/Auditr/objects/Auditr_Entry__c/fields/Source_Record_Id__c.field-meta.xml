@@ -3,8 +3,8 @@
     <fullName>Source_Record_Id__c</fullName>
     <caseSensitive>true</caseSensitive>
     <description>Original 18-character Salesforce record ID from the source audit object (such as SetupAuditTrail.Id).</description>
-    <inlineHelpText>The unique 18-character Salesforce ID of the source audit record (e.g., 0Ym... from SetupAuditTrail).</inlineHelpText>
     <externalId>true</externalId>
+    <inlineHelpText>The unique 18-character Salesforce ID of the source audit record (e.g., 0Ym... from SetupAuditTrail).</inlineHelpText>
     <label>Source Record ID</label>
     <length>18</length>
     <required>true</required>

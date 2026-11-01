@@ -3,8 +3,8 @@
     <fullName>Is_Active__c</fullName>
     <defaultValue>true</defaultValue>
     <description>Whether this classification rule is evaluated during ingestion.</description>
-    <inlineHelpText>Enable or disable this classification rule without deleting the metadata record.</inlineHelpText>
     <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Enable or disable this classification rule without deleting the metadata record.</inlineHelpText>
     <label>Is Active</label>
     <type>Checkbox</type>
 </CustomField>

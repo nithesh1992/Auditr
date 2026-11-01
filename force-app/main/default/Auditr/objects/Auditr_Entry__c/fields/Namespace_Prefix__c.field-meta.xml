@@ -2,8 +2,8 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Namespace_Prefix__c</fullName>
     <description>Package namespace prefix from SetupAuditTrail.ResponsibleNamespacePrefix.</description>
-    <inlineHelpText>The package namespace prefix when a managed or unlocked package triggered the Setup change.</inlineHelpText>
     <externalId>false</externalId>
+    <inlineHelpText>The package namespace prefix when a managed or unlocked package triggered the Setup change.</inlineHelpText>
     <label>Namespace Prefix</label>
     <length>15</length>
     <required>false</required>

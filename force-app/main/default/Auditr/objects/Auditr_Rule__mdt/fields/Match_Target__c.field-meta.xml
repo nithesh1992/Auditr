@@ -2,8 +2,8 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Match_Target__c</fullName>
     <description>Source field on the audit event to inspect when evaluating this rule.</description>
-    <inlineHelpText>Select which SetupAuditTrail field this rule evaluates.</inlineHelpText>
     <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Select which SetupAuditTrail field this rule evaluates.</inlineHelpText>
     <label>Match Target</label>
     <required>true</required>
     <type>Picklist</type>

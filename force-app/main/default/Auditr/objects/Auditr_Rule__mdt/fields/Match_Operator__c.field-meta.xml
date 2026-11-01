@@ -2,8 +2,8 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Match_Operator__c</fullName>
     <description>Case-insensitive string comparison operator applied to Match Target.</description>
-    <inlineHelpText>Select how Match Value is compared against the selected Match Target field.</inlineHelpText>
     <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Select how Match Value is compared against the selected Match Target field.</inlineHelpText>
     <label>Match Operator</label>
     <required>true</required>
     <type>Picklist</type>

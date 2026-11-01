@@ -2,8 +2,8 @@
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>Delegate_User__c</fullName>
     <description>Actual user or support agent who performed the action while logged in as another user (SetupAuditTrail.DelegateUser).</description>
-    <inlineHelpText>The username or Support identifier of the actual person who performed the action while logged in as another user.</inlineHelpText>
     <externalId>false</externalId>
+    <inlineHelpText>The username or Support identifier of the actual person who performed the action while logged in as another user.</inlineHelpText>
     <label>Delegate User</label>
     <length>80</length>
     <required>false</required>
