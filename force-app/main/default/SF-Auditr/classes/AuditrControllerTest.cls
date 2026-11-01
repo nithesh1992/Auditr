@@ -24,7 +24,7 @@ private class AuditrControllerTest {
         System.runAs(new User(Id = UserInfo.getUserId())) {
             Test.startTest();
             sevenDayMetrics = AuditrController.getAtAGlanceMetrics(7);
-            allTimeMetrics = AuditrController.getAtAGlanceMetrics(0);
+            allTimeMetrics = AuditrController.getAtAGlanceMetrics(365);
             status = AuditrController.getControlCenterStatus();
             incidentEvents = AuditrController.getIncidentTimeline(System.now(), 60, true);
             Test.stopTest();

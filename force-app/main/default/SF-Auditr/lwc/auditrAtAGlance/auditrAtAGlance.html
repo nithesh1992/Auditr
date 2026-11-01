@@ -41,54 +41,54 @@
             <div class="slds-grid slds-wrap slds-gutters_small">
                 <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-6 slds-m-bottom_x-small">
                     <div class="slds-box slds-box_x-small slds-theme_shade">
-                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Total Audit Events">Total Events</p>
+                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Total Audit Events (Capped at 25,000)">Total Events</p>
                         <p class="slds-text-heading_large slds-m-top_xx-small">
-                            <lightning-formatted-number value={metrics.totalEntries}></lightning-formatted-number>
+                            <lightning-formatted-number value={metrics.totalEntries}></lightning-formatted-number>{totalEntriesSuffix}
                         </p>
                     </div>
                 </div>
 
                 <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-6 slds-m-bottom_x-small">
                     <div class="slds-box slds-box_x-small slds-theme_shade">
-                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Critical and High Risk">Critical &amp; High</p>
+                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Critical and High Risk (Capped at 5,000)">Critical &amp; High</p>
                         <p class="slds-text-heading_large slds-m-top_xx-small slds-text-color_error">
-                            <lightning-formatted-number value={metrics.criticalAndHighCount}></lightning-formatted-number>
+                            <lightning-formatted-number value={metrics.criticalAndHighCount}></lightning-formatted-number>{criticalAndHighSuffix}
                         </p>
                     </div>
                 </div>
 
                 <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-6 slds-m-bottom_x-small">
                     <div class="slds-box slds-box_x-small slds-theme_shade">
-                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Security and Access Changes">Security &amp; Access</p>
+                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Security and Access Changes (Capped at 5,000)">Security &amp; Access</p>
                         <p class="slds-text-heading_large slds-m-top_xx-small">
-                            <lightning-formatted-number value={metrics.securityAndAccessCount}></lightning-formatted-number>
+                            <lightning-formatted-number value={metrics.securityAndAccessCount}></lightning-formatted-number>{securityAndAccessSuffix}
                         </p>
                     </div>
                 </div>
 
                 <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-6 slds-m-bottom_x-small">
                     <div class="slds-box slds-box_x-small slds-theme_shade">
-                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Automation, Code, and Data Model Changes">Automation &amp; Code</p>
+                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Automation, Code, and Data Model Changes (Capped at 5,000)">Automation &amp; Code</p>
                         <p class="slds-text-heading_large slds-m-top_xx-small">
-                            <lightning-formatted-number value={metrics.automationAndMetadataCount}></lightning-formatted-number>
+                            <lightning-formatted-number value={metrics.automationAndMetadataCount}></lightning-formatted-number>{automationAndMetadataSuffix}
                         </p>
                     </div>
                 </div>
 
                 <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-6 slds-m-bottom_x-small">
                     <div class="slds-box slds-box_x-small slds-theme_shade">
-                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Delegated / Login-As Activity">Impersonated</p>
+                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Delegated / Login-As Activity (Capped at 5,000)">Impersonated</p>
                         <p class="slds-text-heading_large slds-m-top_xx-small">
-                            <lightning-formatted-number value={metrics.impersonatedCount}></lightning-formatted-number>
+                            <lightning-formatted-number value={metrics.impersonatedCount}></lightning-formatted-number>{impersonatedSuffix}
                         </p>
                     </div>
                 </div>
 
                 <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-6 slds-m-bottom_x-small">
                     <div class="slds-box slds-box_x-small slds-theme_shade">
-                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Unclassified Events">Unclassified</p>
+                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Unclassified Events (Capped at 5,000)">Unclassified</p>
                         <p class="slds-text-heading_large slds-m-top_xx-small">
-                            <lightning-formatted-number value={metrics.unclassifiedCount}></lightning-formatted-number>
+                            <lightning-formatted-number value={metrics.unclassifiedCount}></lightning-formatted-number>{unclassifiedSuffix}
                         </p>
                     </div>
                 </div>
@@ -112,7 +112,7 @@
                         No audit events synced yet. Open the Control Center tab to run initial sync.
                     </template>
                 </span>
-                <span class="slds-text-body_small slds-text-color_weak">Window: {selectedWindowLabel}</span>
+                <span class="slds-text-body_small slds-text-color_weak">Window: {selectedWindowLabel} &bull; Capped at 25k total / 5k per KPI</span>
             </div>
 
             <!-- Incident Mode Panel (inspired by WhatChanged) -->
@@ -122,7 +122,7 @@
                         <div>
                             <h3 class="slds-text-heading_small">Incident Mode — What Changed Around a Timestamp?</h3>
                             <p class="slds-text-body_small slds-text-color_weak">
-                                Pinpoint every Setup configuration change within a tight window around a production issue or deployment.
+                                Pinpoint every Setup configuration change within a tight window around a production issue or deployment (up to 100 events).
                             </p>
                         </div>
                     </div>

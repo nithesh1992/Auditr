@@ -7,8 +7,12 @@ const WINDOW_OPTIONS = [
     { label: 'Last 24 Hours', value: '1' },
     { label: 'Last 7 Days', value: '7' },
     { label: 'Last 30 Days', value: '30' },
-    { label: 'All Time', value: '0' }
+    { label: 'Last 90 Days', value: '90' },
+    { label: 'Last 1 Year', value: '365' }
 ];
+
+const TOTAL_COUNT_CAP = 25000;
+const KPI_COUNT_CAP = 5000;
 
 const RADIUS_OPTIONS = [
     { label: '± 15 Minutes', value: '15' },
@@ -73,6 +77,30 @@ export default class AuditrAtAGlance extends LightningElement {
     get selectedWindowLabel() {
         const match = this.windowOptions.find((opt) => opt.value === this.selectedWindow);
         return match ? match.label : 'Last 7 Days';
+    }
+
+    get totalEntriesSuffix() {
+        return (this.metrics.totalEntries || 0) >= TOTAL_COUNT_CAP ? '+' : '';
+    }
+
+    get criticalAndHighSuffix() {
+        return (this.metrics.criticalAndHighCount || 0) >= KPI_COUNT_CAP ? '+' : '';
+    }
+
+    get securityAndAccessSuffix() {
+        return (this.metrics.securityAndAccessCount || 0) >= KPI_COUNT_CAP ? '+' : '';
+    }
+
+    get automationAndMetadataSuffix() {
+        return (this.metrics.automationAndMetadataCount || 0) >= KPI_COUNT_CAP ? '+' : '';
+    }
+
+    get impersonatedSuffix() {
+        return (this.metrics.impersonatedCount || 0) >= KPI_COUNT_CAP ? '+' : '';
+    }
+
+    get unclassifiedSuffix() {
+        return (this.metrics.unclassifiedCount || 0) >= KPI_COUNT_CAP ? '+' : '';
     }
 
     get incidentButtonLabel() {

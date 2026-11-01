@@ -92,13 +92,14 @@ public with sharing class AuditrController {
     }
 
     /**
-     * @description Returns high-level security KPIs for the Auditr Home At-a-Glance LWC with LDV-safe row caps.
-     * @param windowDays Number of days to look back (e.g., 1, 7, 30; <= 0 or null for all time).
+     * @description Returns high-level security KPIs for the Auditr Home At-a-Glance LWC (clamped to max 365 days with LDV-safe row caps).
+     * @param windowDays Number of days to look back (1..365; defaults to 365 when <= 0, null, or > 365).
      * @return AtAGlanceDTO populated with counts and latest watermark.
      */
     @AuraEnabled(cacheable=true)
     public static AtAGlanceDTO getAtAGlanceMetrics(Integer windowDays) {
-        DateTime sinceDate = (windowDays != null && windowDays > 0) ? System.now().addDays(-windowDays) : DateTime.newInstance(2000, 1, 1);
+        Integer effectiveDays = (windowDays != null && windowDays > 0 && windowDays <= 365) ? windowDays : 365;
+        DateTime sinceDate = System.now().addDays(-effectiveDays);
         String defaultCategory = AuditrUtil.DEFAULT_CATEGORY;
         AtAGlanceDTO metrics = new AtAGlanceDTO();
         metrics.totalEntries = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate WITH USER_MODE LIMIT :TOTAL_COUNT_CAP];
