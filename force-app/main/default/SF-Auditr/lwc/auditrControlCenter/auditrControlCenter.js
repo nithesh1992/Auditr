@@ -85,14 +85,6 @@ export default class AuditrControlCenter extends LightningElement {
         return this.status.enablePurge ? `Purge after ${this.status.retentionDays} days` : 'Retain Indefinitely';
     }
 
-    get totalEntriesSuffix() {
-        return (this.status.totalEntries || 0) >= 25000 ? '+' : '';
-    }
-
-    get unclassifiedEntriesSuffix() {
-        return (this.status.unclassifiedEntries || 0) >= 10000 ? '+' : '';
-    }
-
     get hasUnclassifiedActions() {
         return Array.isArray(this.status.topUnclassifiedActions) && this.status.topUnclassifiedActions.length > 0;
     }

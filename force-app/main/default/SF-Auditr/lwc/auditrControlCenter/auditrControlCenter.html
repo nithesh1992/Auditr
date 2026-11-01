@@ -1,29 +1,30 @@
 <template>
-    <div class="slds-grid slds-wrap slds-gutters_small">
+    <div class="control-center-layout">
         <!-- Main Operational Header Card -->
-        <div class="slds-col slds-size_1-of-1 slds-m-bottom_small">
-            <lightning-card title="Auditr Control Center" icon-name="standard:settings">
-                <div slot="actions" class="slds-grid slds-grid_vertical-align-center">
+        <div class="cc-card">
+            <div class="card-header">
+                <div class="header-title">
+                    <lightning-icon icon-name="standard:settings" size="small" alternative-text="Control Center"></lightning-icon>
+                    <h2 class="title-text">Auditr Control Center</h2>
+                </div>
+                <div class="header-actions">
                     <lightning-button
                         label="Sync Now"
                         variant="brand"
                         icon-name="utility:sync"
                         onclick={handleSyncNow}
                         disabled={isBusy}
-                        class="slds-m-right_x-small"
                     ></lightning-button>
                     <lightning-button
                         label="Reclassify Unclassified"
                         icon-name="utility:magicwand"
                         onclick={handleReclassifyUnclassified}
                         disabled={isBusy}
-                        class="slds-m-right_x-small"
                     ></lightning-button>
                     <lightning-button
                         label="Reclassify All"
                         onclick={handleReclassifyAll}
                         disabled={isBusy}
-                        class="slds-m-right_x-small"
                     ></lightning-button>
                     <lightning-button-icon
                         icon-name="utility:refresh"
@@ -32,195 +33,167 @@
                         onclick={handleRefresh}
                     ></lightning-button-icon>
                 </div>
+            </div>
 
-                <div class="slds-p-horizontal_medium slds-p-bottom_medium">
-                    <template lwc:if={status.isStaleSync}>
-                        <div class="slds-scoped-notification slds-media slds-media_center slds-m-bottom_medium" role="status">
-                            <div class="slds-media__figure">
-                                <lightning-icon icon-name="utility:warning" variant="warning" size="small" alternative-text="Warning"></lightning-icon>
-                            </div>
-                            <div class="slds-media__body">
-                                <p><strong>Health Notice:</strong> {status.healthWarning}</p>
-                            </div>
-                        </div>
-                    </template>
-
-                    <!-- Operational Summary Strip -->
-                    <div class="slds-grid slds-wrap slds-gutters_small slds-m-bottom_medium">
-                        <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-4 slds-m-bottom_x-small">
-                            <div class="slds-box slds-box_x-small slds-theme_shade">
-                                <p class="slds-text-title_caps slds-text-color_weak">Ingestion Engine</p>
-                                <p class="slds-text-heading_small slds-m-top_xx-small">{engineStatusLabel}</p>
-                                <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
-                                    Backfill: {status.backfillDays}d &bull; Batch: {status.batchSize}
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-4 slds-m-bottom_x-small">
-                            <div class="slds-box slds-box_x-small slds-theme_shade">
-                                <p class="slds-text-title_caps slds-text-color_weak" title="Total capped at 25,000; Unclassified scoped to last 30 days (capped at 10,000)">Stored Audit Entries (Cap 25k)</p>
-                                <p class="slds-text-heading_small slds-m-top_xx-small">
-                                    <lightning-formatted-number value={status.totalEntries}></lightning-formatted-number>{totalEntriesSuffix}
-                                    &nbsp;total (<lightning-formatted-number value={status.unclassifiedEntries}></lightning-formatted-number>{unclassifiedEntriesSuffix} unclassified in 30d)
-                                </p>
-                                <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
-                                    <template lwc:if={status.lastSyncedOccurredAt}>
-                                        Watermark:&nbsp;
-                                        <lightning-formatted-date-time
-                                            value={status.lastSyncedOccurredAt}
-                                            year="numeric"
-                                            month="short"
-                                            day="2-digit"
-                                            hour="2-digit"
-                                            minute="2-digit"
-                                        ></lightning-formatted-date-time>
-                                    </template>
-                                    <template lwc:else>No entries synced yet</template>
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-4 slds-m-bottom_x-small">
-                            <div class="slds-box slds-box_x-small slds-theme_shade">
-                                <p class="slds-text-title_caps slds-text-color_weak">Daily Sync Schedule</p>
-                                <p class="slds-text-heading_small slds-m-top_xx-small">{scheduleStatusLabel}</p>
-                                <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
-                                    <template lwc:if={status.isScheduled}>
-                                        Next:&nbsp;
-                                        <lightning-formatted-date-time
-                                            value={status.nextFireTime}
-                                            month="short"
-                                            day="2-digit"
-                                            hour="2-digit"
-                                            minute="2-digit"
-                                        ></lightning-formatted-date-time>
-                                    </template>
-                                    <template lwc:else>Preferred hour: {status.preferredSyncHour}:00</template>
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-4 slds-m-bottom_x-small">
-                            <div class="slds-box slds-box_x-small slds-theme_shade">
-                                <p class="slds-text-title_caps slds-text-color_weak">Retention Policy</p>
-                                <p class="slds-text-heading_small slds-m-top_xx-small">{retentionStatusLabel}</p>
-                                <p class="slds-text-body_small slds-text-color_weak slds-m-top_xx-small">
-                                    Configure in Setup &rarr; Custom Metadata Types
-                                </p>
-                            </div>
-                        </div>
+            <template lwc:if={status.isStaleSync}>
+                <div class="slds-scoped-notification slds-media slds-media_center slds-m-bottom_medium" role="status">
+                    <div class="slds-media__figure">
+                        <lightning-icon icon-name="utility:warning" variant="warning" size="small" alternative-text="Warning"></lightning-icon>
                     </div>
-
-                    <!-- Daily Schedule Controls -->
-                    <div class="slds-box slds-box_x-small">
-                        <div class="slds-grid slds-wrap slds-gutters_small slds-grid_vertical-align-end">
-                            <div class="slds-col slds-size_1-of-1 slds-medium-size_4-of-12">
-                                <lightning-combobox
-                                    name="scheduleHour"
-                                    label="Daily Sync Hour (Org Time Zone)"
-                                    value={selectedHour}
-                                    options={hourOptions}
-                                    onchange={handleHourChange}
-                                ></lightning-combobox>
-                            </div>
-                            <div class="slds-col slds-size_1-of-1 slds-medium-size_8-of-12">
-                                <lightning-button
-                                    label="Schedule Daily Sync"
-                                    variant="neutral"
-                                    icon-name="utility:event"
-                                    onclick={handleScheduleSync}
-                                    disabled={isBusy}
-                                    class="slds-m-right_x-small"
-                                ></lightning-button>
-                                <template lwc:if={status.isScheduled}>
-                                    <lightning-button
-                                        label="Unschedule"
-                                        variant="destructive-text"
-                                        icon-name="utility:clear"
-                                        onclick={handleUnscheduleSync}
-                                        disabled={isBusy}
-                                    ></lightning-button>
-                                </template>
-                                <template lwc:if={status.scheduleOwnerUsername}>
-                                    <span class="slds-text-body_small slds-text-color_weak slds-m-left_small">
-                                        Scheduled by: {status.scheduleOwnerUsername}
-                                    </span>
-                                </template>
-                            </div>
-                        </div>
+                    <div class="slds-media__body">
+                        <p><strong>Health Notice:</strong> {status.healthWarning}</p>
                     </div>
                 </div>
-            </lightning-card>
-        </div>
+            </template>
 
-        <!-- Left Column: Top Unclassified Actions -->
-        <div class="slds-col slds-size_1-of-1 slds-large-size_5-of-12 slds-m-bottom_small">
-            <lightning-card title="Top Unclassified Setup Actions (Last 30 Days &bull; Top 10)" icon-name="standard:task2">
-                <div class="slds-p-horizontal_medium slds-p-bottom_medium">
-                    <template lwc:if={hasUnclassifiedActions}>
-                        <lightning-datatable
-                            key-field="rowKey"
-                            data={unclassifiedActionRows}
-                            columns={unclassifiedColumns}
-                            hide-checkbox-column
-                        ></lightning-datatable>
+            <!-- Operational Summary Strip (3 Cards) -->
+            <div class="summary-grid">
+                <div class="summary-card">
+                    <p class="summary-label">Ingestion Engine</p>
+                    <p class="summary-value">{engineStatusLabel}</p>
+                    <p class="summary-subtext">
+                        Backfill: {status.backfillDays}d &bull; Batch: {status.batchSize}
+                    </p>
+                </div>
+
+                <div class="summary-card">
+                    <p class="summary-label">Daily Sync Schedule</p>
+                    <p class="summary-value">{scheduleStatusLabel}</p>
+                    <p class="summary-subtext">
+                        <template lwc:if={status.isScheduled}>
+                            Next:&nbsp;
+                            <lightning-formatted-date-time
+                                value={status.nextFireTime}
+                                month="short"
+                                day="2-digit"
+                                hour="2-digit"
+                                minute="2-digit"
+                            ></lightning-formatted-date-time>
+                        </template>
+                        <template lwc:else>Preferred hour: {status.preferredSyncHour}:00</template>
+                    </p>
+                </div>
+
+                <div class="summary-card">
+                    <p class="summary-label">Retention Policy</p>
+                    <p class="summary-value">{retentionStatusLabel}</p>
+                    <p class="summary-subtext">
+                        Configure in Setup &rarr; Custom Metadata Types
+                    </p>
+                </div>
+            </div>
+
+            <!-- Daily Schedule Controls -->
+            <div class="schedule-box">
+                <div class="schedule-hour-picker">
+                    <lightning-combobox
+                        name="scheduleHour"
+                        label="Daily Sync Hour (Org Time Zone)"
+                        value={selectedHour}
+                        options={hourOptions}
+                        onchange={handleHourChange}
+                    ></lightning-combobox>
+                </div>
+                <div class="schedule-actions">
+                    <lightning-button
+                        label="Schedule Daily Sync"
+                        variant="neutral"
+                        icon-name="utility:event"
+                        onclick={handleScheduleSync}
+                        disabled={isBusy}
+                    ></lightning-button>
+                    <template lwc:if={status.isScheduled}>
+                        <lightning-button
+                            label="Unschedule"
+                            variant="destructive-text"
+                            icon-name="utility:clear"
+                            onclick={handleUnscheduleSync}
+                            disabled={isBusy}
+                        ></lightning-button>
                     </template>
-                    <template lwc:else>
-                        <p class="slds-text-body_small slds-text-color_weak">
-                            No unclassified setup actions in the last 30 days.
-                        </p>
+                    <template lwc:if={status.scheduleOwnerUsername}>
+                        <span class="slds-text-body_small slds-text-color_weak">
+                            Scheduled by: {status.scheduleOwnerUsername}
+                        </span>
                     </template>
                 </div>
-            </lightning-card>
+            </div>
         </div>
 
-        <!-- Right Column: Recent AsyncApexJob Executions -->
-        <div class="slds-col slds-size_1-of-1 slds-large-size_7-of-12 slds-m-bottom_small">
-            <lightning-card title="Recent Batch Jobs (Last 10 Runs)" icon-name="standard:process">
-                <div class="slds-p-horizontal_medium slds-p-bottom_medium">
-                    <template lwc:if={hasRecentJobs}>
-                        <lightning-datatable
-                            key-field="jobId"
-                            data={status.recentJobs}
-                            columns={jobColumns}
-                            hide-checkbox-column
-                        ></lightning-datatable>
-                    </template>
-                    <template lwc:else>
-                        <p class="slds-text-body_small slds-text-color_weak">
-                            No Auditr batch executions recorded yet.
-                        </p>
-                    </template>
+        <!-- Middle Row: Unclassified Actions & Recent Batch Jobs -->
+        <div class="middle-row-grid">
+            <!-- Left Column: Top Unclassified Actions -->
+            <div class="cc-card">
+                <div class="card-header">
+                    <div class="header-title">
+                        <lightning-icon icon-name="standard:task2" size="small" alternative-text="Unclassified Actions"></lightning-icon>
+                        <h2 class="title-text">Top Unclassified Setup Actions (Last 30 Days &bull; Top 10)</h2>
+                    </div>
                 </div>
-            </lightning-card>
+                <template lwc:if={hasUnclassifiedActions}>
+                    <lightning-datatable
+                        key-field="rowKey"
+                        data={unclassifiedActionRows}
+                        columns={unclassifiedColumns}
+                        hide-checkbox-column
+                    ></lightning-datatable>
+                </template>
+                <template lwc:else>
+                    <p class="slds-text-body_small slds-text-color_weak">
+                        No unclassified setup actions in the last 30 days.
+                    </p>
+                </template>
+            </div>
+
+            <!-- Right Column: Recent AsyncApexJob Executions -->
+            <div class="cc-card">
+                <div class="card-header">
+                    <div class="header-title">
+                        <lightning-icon icon-name="standard:process" size="small" alternative-text="Batch Jobs"></lightning-icon>
+                        <h2 class="title-text">Recent Batch Jobs (Last 10 Runs)</h2>
+                    </div>
+                </div>
+                <template lwc:if={hasRecentJobs}>
+                    <lightning-datatable
+                        key-field="jobId"
+                        data={status.recentJobs}
+                        columns={jobColumns}
+                        hide-checkbox-column
+                    ></lightning-datatable>
+                </template>
+                <template lwc:else>
+                    <p class="slds-text-body_small slds-text-color_weak">
+                        No Auditr batch executions recorded yet.
+                    </p>
+                </template>
+            </div>
         </div>
 
         <!-- Full Width: Active Classification Rules Inspector -->
-        <div class="slds-col slds-size_1-of-1">
-            <lightning-card title={rulesCardTitle} icon-name="standard:decision">
-                <div class="slds-p-horizontal_medium slds-p-bottom_medium">
-                    <div class="slds-grid slds-wrap slds-gutters_small slds-m-bottom_small">
-                        <div class="slds-col slds-size_1-of-1 slds-medium-size_6-of-12">
-                            <lightning-input
-                                type="search"
-                                name="ruleSearch"
-                                label="Filter Rules"
-                                variant="label-hidden"
-                                placeholder="Search by rule label, match value, category, or risk..."
-                                value={ruleSearchTerm}
-                                onchange={handleRuleSearchChange}
-                            ></lightning-input>
-                        </div>
-                    </div>
-                    <lightning-datatable
-                        key-field="developerName"
-                        data={filteredRules}
-                        columns={ruleColumns}
-                        hide-checkbox-column
-                    ></lightning-datatable>
+        <div class="cc-card">
+            <div class="card-header">
+                <div class="header-title">
+                    <lightning-icon icon-name="standard:decision" size="small" alternative-text="Active Rules"></lightning-icon>
+                    <h2 class="title-text">{rulesCardTitle}</h2>
                 </div>
-            </lightning-card>
+            </div>
+            <div class="rule-search-bar">
+                <lightning-input
+                    type="search"
+                    name="ruleSearch"
+                    label="Filter Rules"
+                    variant="label-hidden"
+                    placeholder="Search by rule label, match value, category, or risk..."
+                    value={ruleSearchTerm}
+                    onchange={handleRuleSearchChange}
+                ></lightning-input>
+            </div>
+            <lightning-datatable
+                key-field="developerName"
+                data={filteredRules}
+                columns={ruleColumns}
+                hide-checkbox-column
+            ></lightning-datatable>
         </div>
     </div>
 </template>

@@ -1,0 +1,125 @@
+.at-a-glance-card {
+    background: #ffffff;
+    border: 1px solid #e5e5e5;
+    border-radius: 0.5rem;
+    padding: 1.125rem 1.5rem 1.25rem;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding-bottom: 0.875rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+}
+
+.title-text {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.window-combobox {
+    min-width: 9.5rem;
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 1rem;
+    margin: 0.25rem 0 1rem;
+}
+
+@media (max-width: 1200px) {
+    .kpi-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.kpi-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 0.875rem 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-width: 0;
+}
+
+.kpi-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #64748b;
+    margin: 0 0 0.375rem 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kpi-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #0f172a;
+    margin: 0;
+}
+
+.kpi-value-danger {
+    color: #dc2626;
+}
+
+.watermark-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-top: 0.125rem;
+}
+
+.incident-panel {
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+}
+
+.incident-controls {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 1.5fr auto;
+    gap: 0.875rem;
+    align-items: end;
+    margin-bottom: 0.875rem;
+}
+
+@media (max-width: 960px) {
+    .incident-controls {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
