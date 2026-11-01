@@ -90,12 +90,12 @@ AuditrController.scheduleDailyPurge(3);
 
 ## How It Compares
 
-| Capability | Native `SetupAuditTrail` | Event Monitoring / Shield | **Auditr** |
-| :--- | :--- | :--- | :--- |
-| **Retention window** | 180 days (UI download) | Requires paid add-on / external storage | **Multi-year or custom retention (`Retention_Days__c`)** |
-| **Risk classification (`Critical`..`Low`)** | None | Custom externally | **Built-in (`36 Auditr_Rule__mdt` rules)** |
-| **Domain categorization** | Raw `Section` text only | Raw event types | **6 normalized categories + custom rules** |
-| **Impersonation / Login-As attribution** | Raw `DelegateUser` column | Separate login events | **`Is_Impersonated__c` + `Responsible_Username__c`** |
-| **Incident time-window investigator** | Manual CSV grep | CRM Analytics studio | **Built-in Incident Mode (`±15m` to `±4h`)** |
-| **Native Lightning Reports & Dashboards** | Not supported on `SetupAuditTrail` | Requires CRM Analytics | **6 reports + 6-widget Security Dashboard included** |
-| **Tamper protection** | System read-only | Read-only big objects | **Trigger-enforced immutability + Field History** |
+| Capability | **Auditr** | Native `SetupAuditTrail` |
+| :--- | :--- | :--- |
+| **Retention window** | **Indefinite or custom (`Retention_Days__c`)** | 180 days (UI download) |
+| **Risk classification (`Critical`..`Low`)** | **Built-in (`36 Auditr_Rule__mdt` rules)** | None |
+| **Domain categorization** | **6 normalized categories + custom rules** | Raw `Section` text only |
+| **Impersonation / Login-As attribution** | **`Is_Impersonated__c` + `Responsible_Username__c`** | Raw `DelegateUser` column |
+| **Incident time-window investigator** | **Built-in Incident Mode (`±15m` to `±4h`)** | Manual CSV grep |
+| **Native Lightning Reports & Dashboards** | **6 reports + 6-widget Security Dashboard included** | Not supported on `SetupAuditTrail` |
+| **Tamper protection** | **Trigger-enforced immutability + Field History** | System read-only |
