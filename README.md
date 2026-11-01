@@ -46,14 +46,14 @@ By default, Auditr retains all `Auditr_Entry__c` records indefinitely to ensure 
 
 ### 1. Install Unlocked Package (Recommended)
 
-Install the latest unlocked package build (`v1.0.0-2`) in any sandbox, scratch org, or production environment:
+Install the latest unlocked package build (`v1.0.0-3`) in any sandbox, scratch org, or production environment:
 
 ```bash
-sf package install --package 04tg7000000cCJVAA2 --target-org <alias> --wait 10
+sf package install --package 04tg7000000cCMjAAM --target-org <alias> --wait 10
 ```
 
 *Or install directly via your browser:*  
-`https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cCJVAA2`
+`https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cCMjAAM`
 
 ---
 
