@@ -3,9 +3,9 @@
     {
       "versionName": "v1.0",
       "versionNumber": "1.0.0.NEXT",
-      "path": "force-app/main/default/SF-Auditr",
+      "path": "force-app/main/default/Auditr",
       "default": true,
-      "package": "SF-Auditr",
+      "package": "Auditr",
       "versionDescription": "Lean, immutable Salesforce Setup Audit Trail intelligence and security monitoring framework."
     },
     {
@@ -13,7 +13,7 @@
       "default": false
     }
   ],
-  "name": "SF-Auditr",
+  "name": "Auditr",
   "namespace": "",
   "sfdcLoginUrl": "https://login.salesforce.com",
   "sourceApiVersion": "68.0",

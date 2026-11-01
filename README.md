@@ -31,7 +31,7 @@
 ### 1. Deploy from source
 
 ```bash
-sf project deploy start --source-dir force-app/main/default/SF-Auditr --target-org <alias>
+sf project deploy start --source-dir force-app/main/default/Auditr --target-org <alias>
 ```
 
 ### 2. Assign permission sets
@@ -68,7 +68,7 @@ flowchart LR
 ```
 
 ```text
-force-app/main/default/SF-Auditr/
+force-app/main/default/Auditr/
 ├── applications/    Auditr Lightning App (branded with Auditr_Logo)
 ├── classes/         AuditrUtil · AuditrEntryTriggerHandler · AuditrSyncBatch
 │                    AuditrReclassifyBatch · AuditrPurgeBatch · AuditrController
