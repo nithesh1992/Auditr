@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Actor__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>User record recorded on SetupAuditTrail.CreatedById (the user acted as when impersonated).</description>
+    <inlineHelpText>The User record recorded in SetupAuditTrail.CreatedById (represents the impersonated user during Login-As sessions).</inlineHelpText>
+    <label>Acted As (User)</label>
+    <referenceTo>User</referenceTo>
+    <relationshipName>Auditr_Entries</relationshipName>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Lookup</type>
+</CustomField>

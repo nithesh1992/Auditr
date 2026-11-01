@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Actor_Issuer__c</fullName>
+    <description>Identity or SSO issuer of the actor (SetupAuditTrail.CreatedByIssuer).</description>
+    <inlineHelpText>The identity provider or SSO issuer associated with the actor session.</inlineHelpText>
+    <externalId>false</externalId>
+    <label>Actor Issuer</label>
+    <length>80</length>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

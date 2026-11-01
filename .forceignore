@@ -1,0 +1,7 @@
+package.xml
+**/jsconfig.json
+**/.eslintrc.json
+**/__tests__/**
+.reference/**
+code-analyzer.yml
+docs/**

@@ -1,0 +1,320 @@
+/**
+ * @description AuraEnabled controller backing the SF-Auditr At-a-Glance Home LWC and Control Center LWC.
+ */
+public with sharing class AuditrController {
+    public static final String SCHEDULED_JOB_NAME = 'Auditr_Daily_Sync';
+    private static final Integer STALE_SYNC_HOURS = 36;
+
+    /** @description Summary KPIs for the Auditr Home At-a-Glance header. */
+    public class AtAGlanceDTO {
+        @AuraEnabled public Integer totalEntries;
+        @AuraEnabled public Integer criticalAndHighCount;
+        @AuraEnabled public Integer securityAndAccessCount;
+        @AuraEnabled public Integer automationAndMetadataCount;
+        @AuraEnabled public Integer impersonatedCount;
+        @AuraEnabled public Integer unclassifiedCount;
+        @AuraEnabled public DateTime lastSyncedOccurredAt;
+    }
+
+    /** @description Audit event entry returned by Incident Mode time-window queries. */
+    public class IncidentEntryDTO {
+        @AuraEnabled public Id recordId;
+        @AuraEnabled public String name;
+        @AuraEnabled public DateTime occurredAt;
+        @AuraEnabled public String riskLevel;
+        @AuraEnabled public String category;
+        @AuraEnabled public String section;
+        @AuraEnabled public String actionCode;
+        @AuraEnabled public String responsibleUsername;
+        @AuraEnabled public String actorUsername;
+        @AuraEnabled public String delegateUser;
+        @AuraEnabled public String displayText;
+    }
+
+    /** @description Full operational state for the Auditr Control Center tab. */
+    @SuppressWarnings('PMD.TooManyFields')
+    public class ControlCenterStatusDTO {
+        @AuraEnabled public Boolean isActive;
+        @AuraEnabled public Integer backfillDays;
+        @AuraEnabled public Integer batchSize;
+        @AuraEnabled public Boolean enablePurge;
+        @AuraEnabled public Integer retentionDays;
+        @AuraEnabled public Integer preferredSyncHour;
+        @AuraEnabled public Integer totalEntries;
+        @AuraEnabled public Integer unclassifiedEntries;
+        @AuraEnabled public DateTime lastSyncedOccurredAt;
+        @AuraEnabled public Boolean isScheduled;
+        @AuraEnabled public DateTime nextFireTime;
+        @AuraEnabled public String scheduleOwnerUsername;
+        @AuraEnabled public Boolean isScheduleOwnerActive;
+        @AuraEnabled public Boolean isStaleSync;
+        @AuraEnabled public String healthWarning;
+        @AuraEnabled public List<JobSummaryDTO> recentJobs;
+        @AuraEnabled public List<RuleSummaryDTO> activeRules;
+        @AuraEnabled public List<UnclassifiedActionDTO> topUnclassifiedActions;
+    }
+
+    /** @description Recent AsyncApexJob execution summary. */
+    public class JobSummaryDTO {
+        @AuraEnabled public Id jobId;
+        @AuraEnabled public String className;
+        @AuraEnabled public String status;
+        @AuraEnabled public Integer jobItemsProcessed;
+        @AuraEnabled public Integer totalJobItems;
+        @AuraEnabled public Integer numberOfErrors;
+        @AuraEnabled public DateTime createdDate;
+        @AuraEnabled public DateTime completedDate;
+        @AuraEnabled public String extendedStatus;
+    }
+
+    /** @description Active Auditr_Rule__mdt summary for the Control Center rule inspector. */
+    public class RuleSummaryDTO {
+        @AuraEnabled public String developerName;
+        @AuraEnabled public String label;
+        @AuraEnabled public Integer priority;
+        @AuraEnabled public String matchTarget;
+        @AuraEnabled public String matchOperator;
+        @AuraEnabled public String matchValue;
+        @AuraEnabled public String category;
+        @AuraEnabled public String riskLevel;
+    }
+
+    /** @description Grouped count of Unclassified Action_Code__c + Section__c pairs. */
+    public class UnclassifiedActionDTO {
+        @AuraEnabled public String actionCode;
+        @AuraEnabled public String section;
+        @AuraEnabled public Integer entryCount;
+    }
+
+    /**
+     * @description Returns high-level security KPIs for the Auditr Home At-a-Glance LWC.
+     * @param windowDays Number of days to look back (e.g., 1, 7, 30; <= 0 or null for all time).
+     * @return AtAGlanceDTO populated with counts and latest watermark.
+     */
+    @AuraEnabled(cacheable=true)
+    public static AtAGlanceDTO getAtAGlanceMetrics(Integer windowDays) {
+        DateTime sinceDate = (windowDays != null && windowDays > 0) ? System.now().addDays(-windowDays) : DateTime.newInstance(2000, 1, 1);
+        String defaultCategory = AuditrUtil.DEFAULT_CATEGORY;
+        AtAGlanceDTO metrics = new AtAGlanceDTO();
+        metrics.totalEntries = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate WITH USER_MODE];
+        metrics.criticalAndHighCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Risk_Level__c IN ('Critical', 'High') WITH USER_MODE];
+        metrics.securityAndAccessCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Category__c IN ('Security & Access', 'Users & Sessions') WITH USER_MODE];
+        metrics.automationAndMetadataCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Category__c IN ('Code & Automation', 'Data & Schema') WITH USER_MODE];
+        metrics.impersonatedCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Delegate_User__c != NULL WITH USER_MODE];
+        metrics.unclassifiedCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Category__c = :defaultCategory WITH USER_MODE];
+        metrics.lastSyncedOccurredAt = queryLatestOccurredAt();
+        return metrics;
+    }
+
+    /**
+     * @description Returns chronological audit events around a specific incident timestamp (Incident Mode).
+     * @param incidentTime Center timestamp of the incident (defaults to System.now() when null).
+     * @param windowMinutes Plus/minus window in minutes around incidentTime (e.g., 15, 30, 60, 240).
+     * @param highRiskOnly True to include only Critical and High risk events; false for all risk levels.
+     * @return List of IncidentEntryDTO ordered chronologically around the incident.
+     */
+    @AuraEnabled(cacheable=true)
+    @SuppressWarnings('PMD.AvoidBooleanMethodParameters')
+    public static List<IncidentEntryDTO> getIncidentTimeline(DateTime incidentTime, Integer windowMinutes, Boolean highRiskOnly) {
+        DateTime anchor = incidentTime ?? System.now();
+        Integer radius = (windowMinutes != null && windowMinutes > 0 && windowMinutes <= 1440) ? windowMinutes : 30;
+        DateTime windowStart = anchor.addMinutes(-radius);
+        DateTime windowEnd = anchor.addMinutes(radius);
+        List<String> allowedRisks = (highRiskOnly == true) ? new List<String>{ 'Critical', 'High' } : new List<String>{ 'Critical', 'High', 'Medium', 'Low' };
+
+        List<IncidentEntryDTO> timeline = new List<IncidentEntryDTO>();
+        for (Auditr_Entry__c entry : [
+            SELECT Id, Name, Occurred_At__c, Risk_Level__c, Category__c, Section__c, Action_Code__c,
+                   Responsible_Username__c, Actor_Username__c, Delegate_User__c, Display__c
+            FROM Auditr_Entry__c
+            WHERE Occurred_At__c >= :windowStart AND Occurred_At__c <= :windowEnd AND Risk_Level__c IN :allowedRisks
+            WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT 100
+        ]) {
+            IncidentEntryDTO dto = new IncidentEntryDTO();
+            dto.recordId = entry.Id;
+            dto.name = entry.Name;
+            dto.occurredAt = entry.Occurred_At__c;
+            dto.riskLevel = entry.Risk_Level__c;
+            dto.category = entry.Category__c;
+            dto.section = entry.Section__c;
+            dto.actionCode = entry.Action_Code__c;
+            dto.responsibleUsername = entry.Responsible_Username__c;
+            dto.actorUsername = entry.Actor_Username__c;
+            dto.delegateUser = entry.Delegate_User__c;
+            dto.displayText = entry.Display__c;
+            timeline.add(dto);
+        }
+        return timeline;
+    }
+
+    /**
+     * @description Returns full operational status, schedule health, recent jobs, active rules, and top unclassified actions.
+     * @return ControlCenterStatusDTO for the Control Center LWC.
+     */
+    @AuraEnabled(cacheable=true)
+    public static ControlCenterStatusDTO getControlCenterStatus() {
+        Auditr_Setting__mdt setting = AuditrUtil.getSetting();
+        String defaultCategory = AuditrUtil.DEFAULT_CATEGORY;
+        ControlCenterStatusDTO status = new ControlCenterStatusDTO();
+        status.isActive = (setting.Is_Active__c == true);
+        status.backfillDays = Integer.valueOf(setting.Backfill_Days__c ?? AuditrUtil.DEFAULT_BACKFILL_DAYS);
+        status.batchSize = AuditrUtil.getBatchSize();
+        status.enablePurge = (setting.Enable_Purge__c == true);
+        status.retentionDays = Integer.valueOf(setting.Retention_Days__c ?? 0);
+        status.preferredSyncHour = Integer.valueOf(setting.Preferred_Sync_Hour__c ?? AuditrUtil.DEFAULT_SYNC_HOUR);
+
+        status.totalEntries = [SELECT COUNT() FROM Auditr_Entry__c WHERE Source__c != NULL WITH USER_MODE];
+        status.unclassifiedEntries = [SELECT COUNT() FROM Auditr_Entry__c WHERE Category__c = :defaultCategory WITH USER_MODE];
+        status.lastSyncedOccurredAt = queryLatestOccurredAt();
+
+        populateScheduleStatus(status);
+        status.recentJobs = queryRecentJobs();
+        status.activeRules = buildActiveRuleSummaries();
+        status.topUnclassifiedActions = queryTopUnclassifiedActions();
+        evaluateHealthWarning(status);
+        return status;
+    }
+
+    /**
+     * @description Executes AuditrSyncBatch immediately.
+     * @return AsyncApexJob Id of the queued batch.
+     */
+    @AuraEnabled
+    public static Id runSyncNow() {
+        return Database.executeBatch(new AuditrSyncBatch(), AuditrUtil.getBatchSize());
+    }
+
+    /**
+     * @description Executes AuditrReclassifyBatch to re-evaluate existing entries against active rules.
+     * @param onlyUnclassified True to re-evaluate only Unclassified rows; false to re-evaluate all rows.
+     * @return AsyncApexJob Id of the queued batch.
+     */
+    @AuraEnabled
+    @SuppressWarnings('PMD.AvoidBooleanMethodParameters')
+    public static Id runReclassify(Boolean onlyUnclassified) {
+        return Database.executeBatch(new AuditrReclassifyBatch(onlyUnclassified != false), AuditrUtil.getBatchSize());
+    }
+
+    /**
+     * @description Schedules AuditrSyncBatch to run daily at the specified hour (0..23).
+     * @param hourOfDay Hour of day (0-23); defaults to Preferred_Sync_Hour__c when null or out of range.
+     * @return Scheduled CronTrigger Id.
+     */
+    @AuraEnabled
+    public static Id scheduleDailySync(Integer hourOfDay) {
+        unscheduleDailySync();
+        Integer targetHour = (hourOfDay != null && hourOfDay >= 0 && hourOfDay <= 23) ? hourOfDay : Integer.valueOf(AuditrUtil.getSetting().Preferred_Sync_Hour__c ?? AuditrUtil.DEFAULT_SYNC_HOUR);
+        return System.schedule(SCHEDULED_JOB_NAME, '0 0 ' + targetHour + ' * * ?', new AuditrSyncBatch());
+    }
+
+    /**
+     * @description Aborts any existing Auditr_Daily_Sync scheduled jobs.
+     */
+    @AuraEnabled
+    public static void unscheduleDailySync() {
+        String jobPattern = SCHEDULED_JOB_NAME + '%';
+        for (CronTrigger job : [SELECT Id FROM CronTrigger WHERE CronJobDetail.Name LIKE :jobPattern WITH SYSTEM_MODE]) {
+            System.abortJob(job.Id);
+        }
+    }
+
+    private static DateTime queryLatestOccurredAt() {
+        String defaultSource = AuditrUtil.DEFAULT_SOURCE;
+        List<Auditr_Entry__c> latest = [SELECT Occurred_At__c FROM Auditr_Entry__c WHERE Source__c = :defaultSource WITH USER_MODE ORDER BY CreatedDate DESC LIMIT 1];
+        return latest.isEmpty() ? null : latest[0].Occurred_At__c;
+    }
+
+    private static void populateScheduleStatus(ControlCenterStatusDTO status) {
+        String jobPattern = SCHEDULED_JOB_NAME + '%';
+        List<CronTrigger> jobs = [
+            SELECT Id, NextFireTime, OwnerId FROM CronTrigger
+            WHERE CronJobDetail.Name LIKE :jobPattern AND State IN ('WAITING', 'ACQUIRED', 'EXECUTING')
+            WITH SYSTEM_MODE ORDER BY CreatedDate DESC LIMIT 1
+        ];
+        if (jobs.isEmpty()) {
+            status.isScheduled = false;
+            status.isScheduleOwnerActive = true;
+            return;
+        }
+        status.isScheduled = true;
+        status.nextFireTime = jobs[0].NextFireTime;
+        List<User> owners = [SELECT Username, IsActive FROM User WHERE Id = :jobs[0].OwnerId WITH SYSTEM_MODE LIMIT 1];
+        status.scheduleOwnerUsername = owners.isEmpty() ? null : owners[0].Username;
+        status.isScheduleOwnerActive = !owners.isEmpty() && owners[0].IsActive;
+    }
+
+    private static List<JobSummaryDTO> queryRecentJobs() {
+        List<JobSummaryDTO> summaries = new List<JobSummaryDTO>();
+        for (AsyncApexJob job : [
+            SELECT Id, ApexClass.Name, Status, JobItemsProcessed, TotalJobItems, NumberOfErrors, CreatedDate, CompletedDate, ExtendedStatus
+            FROM AsyncApexJob
+            WHERE ApexClass.Name IN ('AuditrSyncBatch', 'AuditrReclassifyBatch', 'AuditrPurgeBatch')
+            WITH SYSTEM_MODE ORDER BY CreatedDate DESC LIMIT 8
+        ]) {
+            JobSummaryDTO dto = new JobSummaryDTO();
+            dto.jobId = job.Id;
+            dto.className = job.ApexClass.Name;
+            dto.status = job.Status;
+            dto.jobItemsProcessed = job.JobItemsProcessed;
+            dto.totalJobItems = job.TotalJobItems;
+            dto.numberOfErrors = job.NumberOfErrors;
+            dto.createdDate = job.CreatedDate;
+            dto.completedDate = job.CompletedDate;
+            dto.extendedStatus = job.ExtendedStatus;
+            summaries.add(dto);
+        }
+        return summaries;
+    }
+
+    private static List<RuleSummaryDTO> buildActiveRuleSummaries() {
+        List<RuleSummaryDTO> rules = new List<RuleSummaryDTO>();
+        for (Auditr_Rule__mdt rule : AuditrUtil.getActiveRules()) {
+            RuleSummaryDTO dto = new RuleSummaryDTO();
+            dto.developerName = rule.DeveloperName;
+            dto.label = rule.MasterLabel;
+            dto.priority = (rule.Priority__c != null) ? Integer.valueOf(rule.Priority__c) : null;
+            dto.matchTarget = rule.Match_Target__c;
+            dto.matchOperator = rule.Match_Operator__c;
+            dto.matchValue = rule.Match_Value__c;
+            dto.category = rule.Category__c;
+            dto.riskLevel = rule.Risk_Level__c;
+            rules.add(dto);
+        }
+        return rules;
+    }
+
+    private static List<UnclassifiedActionDTO> queryTopUnclassifiedActions() {
+        String defaultCategory = AuditrUtil.DEFAULT_CATEGORY;
+        List<UnclassifiedActionDTO> actions = new List<UnclassifiedActionDTO>();
+        for (AggregateResult row : [
+            SELECT Action_Code__c actionCode, Section__c sectionName, COUNT(Id) entryCount
+            FROM Auditr_Entry__c WHERE Category__c = :defaultCategory
+            WITH USER_MODE GROUP BY Action_Code__c, Section__c ORDER BY COUNT(Id) DESC LIMIT 10
+        ]) {
+            UnclassifiedActionDTO dto = new UnclassifiedActionDTO();
+            dto.actionCode = (String) row.get('actionCode');
+            dto.section = (String) row.get('sectionName');
+            dto.entryCount = (Integer) row.get('entryCount');
+            actions.add(dto);
+        }
+        return actions;
+    }
+
+    private static void evaluateHealthWarning(ControlCenterStatusDTO status) {
+        Boolean lastSyncFailed = !status.recentJobs.isEmpty() && (status.recentJobs[0].status == 'Failed' || status.recentJobs[0].numberOfErrors > 0);
+        Boolean isWatermarkStale = status.lastSyncedOccurredAt == null || status.lastSyncedOccurredAt < System.now().addHours(-STALE_SYNC_HOURS);
+
+        if (status.isScheduled && !status.isScheduleOwnerActive) {
+            status.isStaleSync = true;
+            status.healthWarning = 'Scheduled job owner (' + status.scheduleOwnerUsername + ') is inactive. Reschedule Daily Sync.';
+        } else if (lastSyncFailed) {
+            status.isStaleSync = true;
+            status.healthWarning = 'The most recent Auditr batch job reported errors. Inspect recent jobs below.';
+        } else if (isWatermarkStale) {
+            status.isStaleSync = true;
+            status.healthWarning = 'Audit watermark is over 36 hours old (or initial backfill has not run). Click Sync Now.';
+        } else {
+            status.isStaleSync = false;
+        }
+    }
+}

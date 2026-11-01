@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Display__c</fullName>
+    <description>Stores the complete, untruncated human-readable SetupAuditTrail.Display text (up to 1,000 characters) as immutable audit evidence.</description>
+    <inlineHelpText>The full untruncated description of the Setup change recorded by Salesforce Setup Audit Trail.</inlineHelpText>
+    <label>Display</label>
+    <length>1000</length>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>LongTextArea</type>
+    <visibleLines>5</visibleLines>
+</CustomField>

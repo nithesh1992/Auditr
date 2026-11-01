@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomTab xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Administrative Control Center for SetupAuditTrail sync scheduling, reclassification, and rule inspection.</description>
+    <flexiPage>Auditr_Control_Center</flexiPage>
+    <label>Control Center</label>
+    <motif>Custom67: Gears</motif>
+</CustomTab>

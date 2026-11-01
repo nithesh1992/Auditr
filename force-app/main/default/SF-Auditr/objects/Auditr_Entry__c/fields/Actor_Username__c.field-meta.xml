@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Actor_Username__c</fullName>
+    <description>Snapshot of the username for CreatedById at the time of ingestion, or System when null.</description>
+    <inlineHelpText>The username of the user account under which the session ran (or System for automated platform processes).</inlineHelpText>
+    <externalId>false</externalId>
+    <label>Acted As Username</label>
+    <length>80</length>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

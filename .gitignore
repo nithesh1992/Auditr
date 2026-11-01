@@ -1,0 +1,20 @@
+# Salesforce DX
+.sfdx/
+.sf/
+.localdevserver/
+
+# OS / Editor
+.DS_Store
+.vscode/
+.idea/
+
+# Dependencies & Build
+node_modules/
+coverage/
+dist/
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+
+# Local Analyzer & Reference
+code-analyzer.yml
+.reference/

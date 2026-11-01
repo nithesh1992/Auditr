@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Report xmlns="http://soap.sforce.com/2006/04/metadata">
+    <columns>
+        <field>CUST_NAME</field>
+    </columns>
+    <columns>
+        <field>Auditr_Entry__c.Occurred_At__c</field>
+    </columns>
+    <columns>
+        <field>Auditr_Entry__c.Risk_Level__c</field>
+    </columns>
+    <columns>
+        <field>Auditr_Entry__c.Category__c</field>
+    </columns>
+    <columns>
+        <field>Auditr_Entry__c.Action_Code__c</field>
+    </columns>
+    <columns>
+        <field>Auditr_Entry__c.Responsible_Username__c</field>
+    </columns>
+    <description>Audit activity grouped by Setup Section to highlight the most active org configuration areas.</description>
+    <format>Summary</format>
+    <groupingsDown>
+        <dateGranularity>Day</dateGranularity>
+        <field>Auditr_Entry__c.Section__c</field>
+        <sortOrder>Asc</sortOrder>
+    </groupingsDown>
+    <name>Entries by Setup Section</name>
+    <params>
+        <name>co</name>
+        <value>1</value>
+    </params>
+    <reportType>CustomEntity$Auditr_Entry__c</reportType>
+    <scope>organization</scope>
+    <showDetails>true</showDetails>
+    <showGrandTotal>true</showGrandTotal>
+    <showSubTotals>true</showSubTotals>
+    <timeFrameFilter>
+        <dateColumn>Auditr_Entry__c.Occurred_At__c</dateColumn>
+        <interval>INTERVAL_CUSTOM</interval>
+    </timeFrameFilter>
+</Report>

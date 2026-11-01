@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+    <label>Lightning Component Change</label>
+    <protected>false</protected>
+    <values>
+        <field>Category__c</field>
+        <value xsi:type="xsd:string">Code &amp; Automation</value>
+    </values>
+    <values>
+        <field>Is_Active__c</field>
+        <value xsi:type="xsd:boolean">true</value>
+    </values>
+    <values>
+        <field>Match_Operator__c</field>
+        <value xsi:type="xsd:string">Equals</value>
+    </values>
+    <values>
+        <field>Match_Target__c</field>
+        <value xsi:type="xsd:string">Section</value>
+    </values>
+    <values>
+        <field>Match_Value__c</field>
+        <value xsi:type="xsd:string">Lightning Components</value>
+    </values>
+    <values>
+        <field>Priority__c</field>
+        <value xsi:type="xsd:double">270.0</value>
+    </values>
+    <values>
+        <field>Risk_Level__c</field>
+        <value xsi:type="xsd:string">Medium</value>
+    </values>
+</CustomMetadata>

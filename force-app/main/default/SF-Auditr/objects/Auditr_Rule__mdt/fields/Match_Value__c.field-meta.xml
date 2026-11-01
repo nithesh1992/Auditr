@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Match_Value__c</fullName>
+    <description>Case-insensitive string value compared against Match Target (ignored when Match Operator is NotBlank).</description>
+    <inlineHelpText>Enter the case-insensitive text to compare against the Match Target (leave blank when using NotBlank).</inlineHelpText>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Match Value</label>
+    <length>255</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

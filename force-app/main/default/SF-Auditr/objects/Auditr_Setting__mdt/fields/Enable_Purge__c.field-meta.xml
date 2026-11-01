@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Enable_Purge__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Opt-in flag to allow automatic purging of Auditr Entry records older than Retention Days. Defaults to false (keep forever).</description>
+    <inlineHelpText>Check only if you want old Auditr Entry records automatically deleted after Retention Days.</inlineHelpText>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Enable Purge</label>
+    <type>Checkbox</type>
+</CustomField>

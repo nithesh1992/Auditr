@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Match_Target__c</fullName>
+    <description>Source field on the audit event to inspect when evaluating this rule.</description>
+    <inlineHelpText>Select which SetupAuditTrail field this rule evaluates.</inlineHelpText>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Match Target</label>
+    <required>true</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Action</fullName>
+                <default>true</default>
+                <label>Action</label>
+            </value>
+            <value>
+                <fullName>Section</fullName>
+                <default>false</default>
+                <label>Section</label>
+            </value>
+            <value>
+                <fullName>NamespacePrefix</fullName>
+                <default>false</default>
+                <label>NamespacePrefix</label>
+            </value>
+            <value>
+                <fullName>DelegateUser</fullName>
+                <default>false</default>
+                <label>DelegateUser</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

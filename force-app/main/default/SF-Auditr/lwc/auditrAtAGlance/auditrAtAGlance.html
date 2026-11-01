@@ -1,0 +1,194 @@
+<template>
+    <lightning-card title="Auditr At a Glance" icon-name="standard:shield">
+        <div slot="actions" class="slds-grid slds-grid_vertical-align-center">
+            <lightning-combobox
+                name="windowSelector"
+                label="Time Window"
+                variant="label-hidden"
+                value={selectedWindow}
+                options={windowOptions}
+                onchange={handleWindowChange}
+                class="slds-m-right_x-small"
+            ></lightning-combobox>
+            <lightning-button
+                label={incidentButtonLabel}
+                icon-name="utility:clock"
+                variant={incidentButtonVariant}
+                onclick={handleToggleIncidentMode}
+                class="slds-m-right_x-small"
+            ></lightning-button>
+            <lightning-button-icon
+                icon-name="utility:refresh"
+                alternative-text="Refresh Metrics"
+                title="Refresh Metrics"
+                onclick={handleRefresh}
+            ></lightning-button-icon>
+        </div>
+
+        <div class="slds-p-horizontal_medium slds-p-bottom_medium">
+            <template lwc:if={errorMessage}>
+                <div class="slds-scoped-notification slds-media slds-media_center slds-m-bottom_small" role="alert">
+                    <div class="slds-media__figure">
+                        <lightning-icon icon-name="utility:error" variant="error" size="small" alternative-text="Error"></lightning-icon>
+                    </div>
+                    <div class="slds-media__body">
+                        <p>{errorMessage}</p>
+                    </div>
+                </div>
+            </template>
+
+            <!-- 6-KPI Strip -->
+            <div class="slds-grid slds-wrap slds-gutters_small">
+                <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-6 slds-m-bottom_x-small">
+                    <div class="slds-box slds-box_x-small slds-theme_shade">
+                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Total Audit Events">Total Events</p>
+                        <p class="slds-text-heading_large slds-m-top_xx-small">
+                            <lightning-formatted-number value={metrics.totalEntries}></lightning-formatted-number>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-6 slds-m-bottom_x-small">
+                    <div class="slds-box slds-box_x-small slds-theme_shade">
+                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Critical and High Risk">Critical &amp; High</p>
+                        <p class="slds-text-heading_large slds-m-top_xx-small slds-text-color_error">
+                            <lightning-formatted-number value={metrics.criticalAndHighCount}></lightning-formatted-number>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-6 slds-m-bottom_x-small">
+                    <div class="slds-box slds-box_x-small slds-theme_shade">
+                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Security and Access Changes">Security &amp; Access</p>
+                        <p class="slds-text-heading_large slds-m-top_xx-small">
+                            <lightning-formatted-number value={metrics.securityAndAccessCount}></lightning-formatted-number>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-6 slds-m-bottom_x-small">
+                    <div class="slds-box slds-box_x-small slds-theme_shade">
+                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Automation, Code, and Data Model Changes">Automation &amp; Code</p>
+                        <p class="slds-text-heading_large slds-m-top_xx-small">
+                            <lightning-formatted-number value={metrics.automationAndMetadataCount}></lightning-formatted-number>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-6 slds-m-bottom_x-small">
+                    <div class="slds-box slds-box_x-small slds-theme_shade">
+                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Delegated / Login-As Activity">Impersonated</p>
+                        <p class="slds-text-heading_large slds-m-top_xx-small">
+                            <lightning-formatted-number value={metrics.impersonatedCount}></lightning-formatted-number>
+                        </p>
+                    </div>
+                </div>
+
+                <div class="slds-col slds-size_1-of-2 slds-medium-size_1-of-3 slds-large-size_1-of-6 slds-m-bottom_x-small">
+                    <div class="slds-box slds-box_x-small slds-theme_shade">
+                        <p class="slds-text-title_caps slds-text-color_weak slds-truncate" title="Unclassified Events">Unclassified</p>
+                        <p class="slds-text-heading_large slds-m-top_xx-small">
+                            <lightning-formatted-number value={metrics.unclassifiedCount}></lightning-formatted-number>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Watermark Footer -->
+            <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-m-top_x-small">
+                <span class="slds-text-body_small slds-text-color_weak">
+                    <template lwc:if={metrics.lastSyncedOccurredAt}>
+                        Latest synced audit event:&nbsp;
+                        <lightning-formatted-date-time
+                            value={metrics.lastSyncedOccurredAt}
+                            year="numeric"
+                            month="short"
+                            day="2-digit"
+                            hour="2-digit"
+                            minute="2-digit"
+                        ></lightning-formatted-date-time>
+                    </template>
+                    <template lwc:else>
+                        No audit events synced yet. Open the Control Center tab to run initial sync.
+                    </template>
+                </span>
+                <span class="slds-text-body_small slds-text-color_weak">Window: {selectedWindowLabel}</span>
+            </div>
+
+            <!-- Incident Mode Panel (inspired by WhatChanged) -->
+            <template lwc:if={isIncidentModeOpen}>
+                <div class="slds-box slds-m-top_medium">
+                    <div class="slds-grid slds-grid_align-spread slds-grid_vertical-align-center slds-m-bottom_small">
+                        <div>
+                            <h3 class="slds-text-heading_small">Incident Mode — What Changed Around a Timestamp?</h3>
+                            <p class="slds-text-body_small slds-text-color_weak">
+                                Pinpoint every Setup configuration change within a tight window around a production issue or deployment.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="slds-grid slds-wrap slds-gutters_small slds-grid_vertical-align-end slds-m-bottom_small">
+                        <div class="slds-col slds-size_1-of-1 slds-medium-size_4-of-12">
+                            <lightning-input
+                                type="datetime"
+                                name="incidentTimestamp"
+                                label="Incident Timestamp"
+                                value={incidentTimestamp}
+                                onchange={handleIncidentTimeChange}
+                            ></lightning-input>
+                        </div>
+                        <div class="slds-col slds-size_1-of-2 slds-medium-size_3-of-12">
+                            <lightning-combobox
+                                name="incidentRadius"
+                                label="Window Radius"
+                                value={incidentRadius}
+                                options={radiusOptions}
+                                onchange={handleRadiusChange}
+                            ></lightning-combobox>
+                        </div>
+                        <div class="slds-col slds-size_1-of-2 slds-medium-size_3-of-12 slds-p-bottom_xx-small">
+                            <lightning-input
+                                type="toggle"
+                                label="Critical &amp; High Risk Only"
+                                name="highRiskOnly"
+                                checked={highRiskOnly}
+                                message-toggle-active="High/Critical Only"
+                                message-toggle-inactive="All Risk Levels"
+                                onchange={handleHighRiskToggle}
+                            ></lightning-input>
+                        </div>
+                        <div class="slds-col slds-size_1-of-1 slds-medium-size_2-of-12">
+                            <lightning-button
+                                label="Investigate"
+                                variant="brand"
+                                icon-name="utility:search"
+                                onclick={handleRunIncidentSearch}
+                                disabled={isLoadingIncident}
+                            ></lightning-button>
+                        </div>
+                    </div>
+
+                    <template lwc:if={isLoadingIncident}>
+                        <div class="slds-p-vertical_medium slds-is-relative">
+                            <lightning-spinner alternative-text="Loading incident timeline" size="small"></lightning-spinner>
+                        </div>
+                    </template>
+
+                    <template lwc:if={hasIncidentRows}>
+                        <lightning-datatable
+                            key-field="recordId"
+                            data={incidentRows}
+                            columns={incidentColumns}
+                            hide-checkbox-column
+                        ></lightning-datatable>
+                    </template>
+                    <template lwc:else>
+                        <p class="slds-text-body_small slds-text-color_weak slds-p-top_x-small">
+                            No audit events matched the selected incident window.
+                        </p>
+                    </template>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>

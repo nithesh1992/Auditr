@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Backfill_Days__c</fullName>
+    <defaultValue>180</defaultValue>
+    <description>Number of historical days to import from SetupAuditTrail on the initial backfill run.</description>
+    <inlineHelpText>Number of historical days (up to 180) to import from SetupAuditTrail when no Auditr Entry records exist yet.</inlineHelpText>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <label>Backfill Days</label>
+    <precision>3</precision>
+    <required>true</required>
+    <scale>0</scale>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

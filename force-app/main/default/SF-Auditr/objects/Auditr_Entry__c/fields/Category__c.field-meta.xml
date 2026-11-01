@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Category__c</fullName>
+    <description>Normalized audit category assigned by the Auditr classification rules engine.</description>
+    <inlineHelpText>The high-level security or administrative domain assigned by active Auditr Classification Rules.</inlineHelpText>
+    <label>Category</label>
+    <required>true</required>
+    <trackHistory>true</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Security &amp; Access</fullName>
+                <default>false</default>
+                <label>Security &amp; Access</label>
+            </value>
+            <value>
+                <fullName>Users &amp; Sessions</fullName>
+                <default>false</default>
+                <label>Users &amp; Sessions</label>
+            </value>
+            <value>
+                <fullName>Code &amp; Automation</fullName>
+                <default>false</default>
+                <label>Code &amp; Automation</label>
+            </value>
+            <value>
+                <fullName>Data &amp; Schema</fullName>
+                <default>false</default>
+                <label>Data &amp; Schema</label>
+            </value>
+            <value>
+                <fullName>Packages &amp; Integrations</fullName>
+                <default>false</default>
+                <label>Packages &amp; Integrations</label>
+            </value>
+            <value>
+                <fullName>Org Preferences</fullName>
+                <default>false</default>
+                <label>Org Preferences</label>
+            </value>
+            <value>
+                <fullName>Unclassified</fullName>
+                <default>true</default>
+                <label>Unclassified</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>
