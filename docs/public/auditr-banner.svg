@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 400" width="1200" height="400" fill="none">
+  <defs>
+    <!-- Matte Carbon-Charcoal Background -->
+    <linearGradient id="bannerBg" x1="0" y1="0" x2="1200" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#07090B"/>
+      <stop offset="55%" stop-color="#0C1014"/>
+      <stop offset="100%" stop-color="#090D10"/>
+    </linearGradient>
+
+    <!-- Ambient Emerald Glow Behind Icon -->
+    <radialGradient id="iconAmbient" cx="230" cy="200" r="175" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0.22"/>
+      <stop offset="55%" stop-color="#10B981" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#10B981" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Left Squircle Fill & Rim -->
+    <linearGradient id="squircleFill" x1="120" y1="90" x2="340" y2="310" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#151C21"/>
+      <stop offset="100%" stop-color="#0B0E11"/>
+    </linearGradient>
+    <linearGradient id="emeraldRim" x1="120" y1="90" x2="340" y2="310" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34D399"/>
+      <stop offset="50%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+
+    <!-- Smoked Glass Shield Gradients -->
+    <linearGradient id="shieldOuter" x1="168" y1="122" x2="292" y2="278" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6B7B85" stop-opacity="0.55"/>
+      <stop offset="50%" stop-color="#2B363E" stop-opacity="0.65"/>
+      <stop offset="100%" stop-color="#151C21" stop-opacity="0.85"/>
+    </linearGradient>
+    <linearGradient id="shieldInner" x1="175" y1="132" x2="285" y2="270" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#253037" stop-opacity="0.92"/>
+      <stop offset="100%" stop-color="#11161A" stop-opacity="0.96"/>
+    </linearGradient>
+    <linearGradient id="shieldHighlight" x1="166" y1="122" x2="230" y2="235" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0.01"/>
+    </linearGradient>
+
+    <!-- Emerald Glow Bar -->
+    <linearGradient id="emeraldBar" x1="194" y1="198" x2="262" y2="198" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="100%" stop-color="#34D399"/>
+    </linearGradient>
+
+    <!-- Architectural Grid Pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#10B981" stroke-opacity="0.06" stroke-width="1"/>
+    </pattern>
+
+    <!-- Glow Filter -->
+    <filter id="glow" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="shieldShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#000000" flood-opacity="0.55"/>
+    </filter>
+  </defs>
+
+  <!-- Banner Background & Grid -->
+  <rect width="1200" height="400" rx="24" fill="url(#bannerBg)"/>
+  <rect width="1200" height="400" rx="24" fill="url(#grid)"/>
+
+  <!-- Ambient Emerald Radial Light -->
+  <circle cx="230" cy="200" r="175" fill="url(#iconAmbient)"/>
+
+  <!-- Left App Icon Container -->
+  <rect x="120" y="90" width="220" height="220" rx="48" fill="url(#squircleFill)" stroke="url(#emeraldRim)" stroke-width="2.5" filter="url(#glow)"/>
+
+  <!-- Smoked Glass Shield Inside Icon -->
+  <g filter="url(#shieldShadow)">
+    <path d="M230 122C250 133 271 139 292 142V194C292 234 265 263 230 276C195 263 168 234 168 194V142C189 139 210 133 230 122Z" fill="url(#shieldOuter)" stroke="#9CA3AF" stroke-opacity="0.32" stroke-width="1.5"/>
+    <path d="M230 130C248 140 266 145 284 148V193C284 228 260 254 230 266C200 254 176 228 176 193V148C194 145 212 140 230 130Z" fill="url(#shieldInner)"/>
+    <path d="M230 122V276C195 263 168 234 168 194V142C189 139 210 133 230 122Z" fill="url(#shieldHighlight)"/>
+  </g>
+
+  <!-- Audit Trail Log Lines Inside Shield -->
+  <!-- Line 1: Muted Silver-Gray Bar -->
+  <rect x="194" y="169" width="72" height="10" rx="5" fill="#7D8B94" fill-opacity="0.65"/>
+
+  <!-- Line 2: Highlighted Luminous Emerald Event Bar -->
+  <rect x="194" y="193" width="62" height="10" rx="5" fill="url(#emeraldBar)" filter="url(#glow)"/>
+
+  <!-- Line 3: Shorter Muted Silver-Gray Bar -->
+  <rect x="194" y="217" width="48" height="10" rx="5" fill="#7D8B94" fill-opacity="0.55"/>
+
+  <!-- Minimal Emerald Verification Checkmark at Bottom-Right of Shield -->
+  <path d="M262 246L270 254L289 235" stroke="#10B981" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+  <path d="M262 246L270 254L289 235" stroke="#6EE7B7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Right Wordmark ('Audit' in crisp white, ONLY 'r' in emerald-jade) & Tagline -->
+  <text x="394" y="214" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="112" font-weight="500" letter-spacing="-1.5" fill="#FFFFFF">Audit<tspan fill="#10B981">r</tspan></text>
+
+  <text x="398" y="268" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="27" font-weight="300" letter-spacing="0.4" fill="#8A9A92">Setup Audit Trail Monitoring &amp; Reporting for Salesforce</text>
+</svg>

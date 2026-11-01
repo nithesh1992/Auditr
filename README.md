@@ -6,6 +6,7 @@
 
 [![Platform: Salesforce](https://img.shields.io/badge/Platform-Salesforce-00A1E0?style=flat-square&logo=salesforce)](https://developer.salesforce.com/)
 [![API Version](https://img.shields.io/badge/API-v68.0-blue?style=flat-square)](https://developer.salesforce.com/)
+[![Docs](https://img.shields.io/badge/Docs-GitHub%20Pages-10b981?style=flat-square)](https://nithesh1992.github.io/Auditr/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 
 **Long-term, classified Setup Audit Trail history inside your org.** Auditr syncs `SetupAuditTrail` into tamper-resistant `Auditr_Entry__c` records, classifies every change by risk level and category using Custom Metadata rules, and gives admins an **Incident Mode** time-window investigator, a **Control Center**, reports, and a security dashboard.
