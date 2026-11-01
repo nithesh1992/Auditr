@@ -8,7 +8,7 @@
     <label>Source Record ID</label>
     <length>18</length>
     <required>true</required>
-    <trackHistory>false</trackHistory>
+    <trackHistory>true</trackHistory>
     <trackTrending>false</trackTrending>
     <type>Text</type>
     <unique>true</unique>
