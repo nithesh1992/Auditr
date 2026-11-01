@@ -134,7 +134,6 @@ public with sharing class AuditrUtil {
             Delegate_User__c = rawAudit.DelegateUser,
             Responsible_Username__c = String.isNotBlank(rawAudit.DelegateUser) ? rawAudit.DelegateUser : actorUsername,
             Actor_Context__c = rawAudit.CreatedByContext,
-            Actor_Issuer__c = rawAudit.CreatedByIssuer,
             Action_Code__c = rawAudit.Action,
             Section__c = sectionValue,
             Category__c = classification.category,

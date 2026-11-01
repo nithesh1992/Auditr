@@ -106,7 +106,7 @@ private class AuditrUtilTest {
     private static void shouldMapSetupAuditTrailToAuditrEntry_WhenBuildEntryCalled() {
         List<SetupAuditTrail> liveRows = [
             SELECT Id, Action, Section, CreatedDate, CreatedById, CreatedBy.Username,
-                   Display, DelegateUser, ResponsibleNamespacePrefix, CreatedByContext, CreatedByIssuer
+                   Display, DelegateUser, ResponsibleNamespacePrefix, CreatedByContext
             FROM SetupAuditTrail
             WITH SYSTEM_MODE
             LIMIT 1

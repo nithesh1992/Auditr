@@ -18,7 +18,6 @@ public with sharing class AuditrTestDataFactory {
             Actor_Username__c = 'acted.as.' + index + '@example.com',
             Delegate_User__c = delegateUser,
             Actor_Context__c = 'InternalUser',
-            Actor_Issuer__c = 'https://login.salesforce.com',
             Action_Code__c = 'changedprofile',
             Section__c = 'Manage Users',
             Category__c = 'Security & Access',

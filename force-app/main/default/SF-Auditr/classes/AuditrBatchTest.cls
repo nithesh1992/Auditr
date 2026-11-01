@@ -8,7 +8,7 @@ private class AuditrBatchTest {
     private static void shouldIngestAndDeduplicateSetupAuditTrail_WhenAuditrSyncBatchRuns() {
         List<SetupAuditTrail> sampleAuditRows = [
             SELECT Id, Action, Section, CreatedDate, CreatedById, CreatedBy.Username,
-                   Display, DelegateUser, ResponsibleNamespacePrefix, CreatedByContext, CreatedByIssuer
+                   Display, DelegateUser, ResponsibleNamespacePrefix, CreatedByContext
             FROM SetupAuditTrail
             WITH SYSTEM_MODE
             ORDER BY CreatedDate DESC

@@ -53,10 +53,6 @@
                 <behavior>Edit</behavior>
                 <field>Actor_Context__c</field>
             </layoutItems>
-            <layoutItems>
-                <behavior>Edit</behavior>
-                <field>Actor_Issuer__c</field>
-            </layoutItems>
         </layoutColumns>
         <style>TwoColumnsTopToBottom</style>
     </layoutSections>

@@ -24,7 +24,7 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
         DateTime cutoffTimestamp = resolveCutoffTimestamp();
         return Database.getQueryLocator([
             SELECT Id, Action, Section, CreatedDate, CreatedById, CreatedBy.Username,
-                   Display, DelegateUser, ResponsibleNamespacePrefix, CreatedByContext, CreatedByIssuer
+                   Display, DelegateUser, ResponsibleNamespacePrefix, CreatedByContext
             FROM SetupAuditTrail
             WHERE CreatedDate >= :cutoffTimestamp
             WITH SYSTEM_MODE

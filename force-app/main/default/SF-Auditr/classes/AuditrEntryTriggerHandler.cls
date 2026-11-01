@@ -17,7 +17,6 @@ public with sharing class AuditrEntryTriggerHandler {
         Auditr_Entry__c.Delegate_User__c,
         Auditr_Entry__c.Responsible_Username__c,
         Auditr_Entry__c.Actor_Context__c,
-        Auditr_Entry__c.Actor_Issuer__c,
         Auditr_Entry__c.Action_Code__c,
         Auditr_Entry__c.Section__c,
         Auditr_Entry__c.Namespace_Prefix__c,
