@@ -18,8 +18,10 @@
 - **Tamper-resistant records.** `AuditrEntryTrigger` blocks `before delete` entirely and blocks `before update` on every audit field except classification fields (`Category__c`, `Risk_Level__c`, `Matched_Rule__c`, `Is_Classified__c`) during an explicit `AuditrReclassifyBatch` run.
 - **Metadata-driven classification.** Ships with 36 `Auditr_Rule__mdt` rules (`EXACT`, `STARTS_WITH`, `CONTAINS`, `REGEX`) evaluated in priority order across `Critical`, `High`, `Medium`, and `Low` risk levels and 6 domain categories (`Security & Access`, `Users & Sessions`, `Code & Automation`, `Data & Schema`, `Org Preferences`, `Packages & Integrations`).
 - **Impersonation & delegate tracking.** Automatically computes `Is_Impersonated__c` and `Responsible_Username__c` when changes are made via delegated admin or *Log in As*.
-- **At-a-Glance + Incident Mode (`auditrAtAGlance`).** 6-KPI rolling summary strip (`Critical`, `High Risk`, `Impersonated`, `Security & Access`, `Code & Flows`, `Unclassified`) with an expandable **Incident Mode** investigator to inspect every setup change inside a `1h`, `6h`, `24h`, `7d`, or custom start/end window.
-- **Control Center (`auditrControlCenter`).** Run **Sync Now**, toggle the daily scheduled sync, trigger **Reclassify Unclassified** or **Reclassify All** after adding rules, inspect the top unclassified setup actions, monitor recent batch jobs, and search active classification rules.
+- **At-a-Glance + Incident Mode (`auditrAtAGlance`).** 6-KPI rolling summary strip (`Total Events`, `Critical & High`, `Security & Access`, `Automation & Code`, `Impersonated`, `Unclassified`) with reader-friendly compact numbers (`25K`, `1.5M`), window filters (up to 1 year), and an expandable **Incident Mode** investigator to pinpoint changes around an exact incident timestamp.
+- **Custom Read-Only Detail Component (`auditrRecordDetail`).** Enforces immutable audit provenance (Section, Action Code, Responsible Actor, Delegate User, Context, Timestamp, Display) with zero inline editing pencils, while allowing authorized admins to reclassify Risk Level & Category in a dedicated modal.
+- **Field History Tracking.** Built-in field history tracking across all audit entry fields with a dedicated `Histories` tab on the record page.
+- **Control Center (`auditrControlCenter`).** Run **Sync Now**, schedule daily automated sync, trigger **Reclassify Unclassified** or **Reclassify All**, inspect top unclassified setup actions (last 30 days), monitor recent batch runs, and search active classification rules.
 - **Reports & Security Dashboard.** 6 pre-built reports and a 6-widget `Auditr_Security_Dashboard` embedded directly on the **Auditr Home** page.
 
 ---
@@ -72,7 +74,7 @@ force-app/main/default/SF-Auditr/
 │                    AuditrReclassifyBatch · AuditrPurgeBatch · AuditrController
 │                    + 5 test classes (AuditrTestDataFactory, etc.)
 ├── triggers/        AuditrEntryTrigger (immutability enforcement)
-├── lwc/             auditrAtAGlance (KPI strip + Incident Mode) · auditrControlCenter
+├── lwc/             auditrAtAGlance · auditrControlCenter · auditrRecordDetail
 ├── objects/         Auditr_Entry__c · Auditr_Rule__mdt · Auditr_Setting__mdt
 ├── customMetadata/  36 classification rules + Default setting (730-day retention)
 ├── flexipages/      Auditr_Home · Auditr_Control_Center · Auditr_Entry_Record_Page
