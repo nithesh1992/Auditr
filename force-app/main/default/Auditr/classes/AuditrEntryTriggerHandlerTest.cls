@@ -53,32 +53,44 @@ private class AuditrEntryTriggerHandlerTest {
         Test.stopTest();
     }
 
-    @IsTest
-    private static void shouldBlockDelete_WhenAllowPurgeDeleteIsFalse() {
-        Auditr_Entry__c existingEntry = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE LIMIT 1];
-        AuditrEntryTriggerHandler.allowPurgeDelete = false;
-
-        Test.startTest();
-        try {
-            Database.delete(existingEntry, AccessLevel.SYSTEM_MODE);
-            Assert.fail('Expected DmlException when deleting Auditr_Entry__c outside purge context');
-        } catch (DmlException expectedException) {
-            Assert.isTrue(expectedException.getMessage().contains(AuditrEntryTriggerHandler.DELETE_BLOCKED_ERROR), 'DML error should include DELETE_BLOCKED_ERROR');
+    private class UnauthorizedDeleteCaller {
+        public void attemptDirectDelete(Auditr_Entry__c targetEntry) {
+            Database.delete(targetEntry, AccessLevel.SYSTEM_MODE);
         }
-        Test.stopTest();
+
+        public void attemptHelperDelete(Auditr_Entry__c targetEntry) {
+            AuditrEntryTriggerHandler.deleteFromPurgeBatch(new List<SObject>{ targetEntry });
+        }
     }
 
     @IsTest
-    private static void shouldAllowDelete_WhenAllowPurgeDeleteIsTrue() {
+    private static void shouldBlockDelete_WhenCalledFromAnotherClass() {
         Auditr_Entry__c existingEntry = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE LIMIT 1];
-        AuditrEntryTriggerHandler.allowPurgeDelete = true;
+        UnauthorizedDeleteCaller caller = new UnauthorizedDeleteCaller();
 
         Test.startTest();
-        Database.delete(existingEntry, AccessLevel.SYSTEM_MODE);
-        AuditrEntryTriggerHandler.allowPurgeDelete = false;
+        try {
+            caller.attemptDirectDelete(existingEntry);
+            Assert.fail('Expected DmlException when deleting Auditr_Entry__c from a class other than AuditrPurgeBatch');
+        } catch (DmlException expectedException) {
+            Assert.isTrue(expectedException.getMessage().contains(AuditrEntryTriggerHandler.DELETE_BLOCKED_ERROR), 'DML error should include DELETE_BLOCKED_ERROR');
+        }
+        caller.attemptHelperDelete(existingEntry);
         Test.stopTest();
 
         Integer remainingCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Id = :existingEntry.Id WITH SYSTEM_MODE];
-        Assert.areEqual(0, remainingCount, 'Record should be deleted when allowPurgeDelete is true');
+        Assert.areEqual(1, remainingCount, 'Record should remain when deleteFromPurgeBatch is called outside AuditrPurgeBatch.execute');
+    }
+
+    @IsTest
+    private static void shouldAllowDelete_WhenCalledFromAuditrPurgeBatchExecute() {
+        Auditr_Entry__c existingEntry = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE LIMIT 1];
+
+        Test.startTest();
+        new AuditrPurgeBatch().execute(null, new List<SObject>{ existingEntry });
+        Test.stopTest();
+
+        Integer remainingCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Id = :existingEntry.Id WITH SYSTEM_MODE];
+        Assert.areEqual(0, remainingCount, 'Record should be deleted when invoked via AuditrPurgeBatch.execute');
     }
 }

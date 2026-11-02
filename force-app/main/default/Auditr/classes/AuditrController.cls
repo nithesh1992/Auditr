@@ -50,6 +50,8 @@ public with sharing class AuditrController {
         @AuraEnabled public Integer totalEntries;
         @AuraEnabled public Integer unclassifiedEntries;
         @AuraEnabled public DateTime lastSyncedOccurredAt;
+        @AuraEnabled public String lastSyncJobStatus;
+        @AuraEnabled public DateTime lastSyncJobCompletedAt;
         @AuraEnabled public Boolean isScheduled;
         @AuraEnabled public Integer scheduledSyncHour;
         @AuraEnabled public DateTime nextFireTime;
@@ -188,7 +190,7 @@ public with sharing class AuditrController {
         status.lastSyncedOccurredAt = queryLatestOccurredAt();
 
         populateScheduleStatus(status);
-        status.recentJobs = queryRecentJobs();
+        status.recentJobs = queryRecentJobs(status);
         status.activeRules = buildActiveRuleSummaries();
         status.topUnclassifiedActions = queryTopUnclassifiedActions(unclassifiedCutoff, status.unclassifiedEntries);
         evaluateHealthWarning(status);
@@ -273,7 +275,7 @@ public with sharing class AuditrController {
 
     private static DateTime queryLatestOccurredAt() {
         String defaultSource = AuditrUtil.DEFAULT_SOURCE;
-        List<Auditr_Entry__c> latest = [SELECT Occurred_At__c FROM Auditr_Entry__c WHERE Source__c = :defaultSource WITH USER_MODE ORDER BY CreatedDate DESC LIMIT 1];
+        List<Auditr_Entry__c> latest = [SELECT Occurred_At__c FROM Auditr_Entry__c WHERE Source__c = :defaultSource WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT 1];
         return latest.isEmpty() ? null : latest[0].Occurred_At__c;
     }
 
@@ -339,7 +341,7 @@ public with sharing class AuditrController {
         return fallbackHour;
     }
 
-    private static List<JobSummaryDTO> queryRecentJobs() {
+    private static List<JobSummaryDTO> queryRecentJobs(ControlCenterStatusDTO status) {
         Map<Id, ApexClass> auditrClasses = new Map<Id, ApexClass>([
             SELECT Id, Name FROM ApexClass
             WHERE Name IN ('AuditrSyncBatch', 'AuditrReclassifyBatch', 'AuditrPurgeBatch')
@@ -348,6 +350,13 @@ public with sharing class AuditrController {
         List<JobSummaryDTO> summaries = new List<JobSummaryDTO>();
         if (auditrClasses.isEmpty()) {
             return summaries;
+        }
+        Id syncClassId;
+        for (ApexClass cls : auditrClasses.values()) {
+            if (cls.Name == 'AuditrSyncBatch') {
+                syncClassId = cls.Id;
+                break;
+            }
         }
         for (AsyncApexJob job : [
             SELECT Id, ApexClassId, Status, JobItemsProcessed, TotalJobItems, NumberOfErrors, CreatedDate, CompletedDate, ExtendedStatus
@@ -366,6 +375,22 @@ public with sharing class AuditrController {
             dto.completedDate = job.CompletedDate;
             dto.extendedStatus = job.ExtendedStatus;
             summaries.add(dto);
+            if (status.lastSyncJobStatus == null && job.ApexClassId == syncClassId) {
+                status.lastSyncJobStatus = job.Status;
+                status.lastSyncJobCompletedAt = job.CompletedDate ?? job.CreatedDate;
+            }
+        }
+        if (status.lastSyncJobStatus == null && syncClassId != null) {
+            List<AsyncApexJob> latestSyncJobs = [
+                SELECT Status, CreatedDate, CompletedDate
+                FROM AsyncApexJob
+                WHERE ApexClassId = :syncClassId AND JobType = 'BatchApex'
+                WITH SYSTEM_MODE ORDER BY CreatedDate DESC LIMIT 1
+            ];
+            if (!latestSyncJobs.isEmpty()) {
+                status.lastSyncJobStatus = latestSyncJobs[0].Status;
+                status.lastSyncJobCompletedAt = latestSyncJobs[0].CompletedDate ?? latestSyncJobs[0].CreatedDate;
+            }
         }
         return summaries;
     }

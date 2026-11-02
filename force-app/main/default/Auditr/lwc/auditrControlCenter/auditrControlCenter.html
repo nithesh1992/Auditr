@@ -52,13 +52,35 @@
                 </div>
             </template>
 
-            <!-- Operational Summary Strip (3 Cards) -->
+            <!-- Operational Summary Strip (4 Cards) -->
             <div class="summary-grid">
                 <div class="summary-card">
                     <p class="summary-label">Ingestion Engine</p>
                     <p class="summary-value">{engineStatusLabel}</p>
                     <p class="summary-subtext">
                         Backfill: {status.backfillDays}d &bull; Batch: {status.batchSize}
+                    </p>
+                </div>
+
+                <div class="summary-card">
+                    <p class="summary-label">Last Sync Job &amp; Entry Age</p>
+                    <p class="summary-value">
+                        {lastSyncJobLabel}
+                        <template lwc:if={status.lastSyncJobCompletedAt}>
+                            <span class="summary-inline-time">
+                                &bull;&nbsp;
+                                <lightning-formatted-date-time
+                                    value={status.lastSyncJobCompletedAt}
+                                    month="short"
+                                    day="2-digit"
+                                    hour="2-digit"
+                                    minute="2-digit"
+                                ></lightning-formatted-date-time>
+                            </span>
+                        </template>
+                    </p>
+                    <p class="summary-subtext">
+                        Newest Occurred_At__c: {newestEntryAgeLabel}
                     </p>
                 </div>
 

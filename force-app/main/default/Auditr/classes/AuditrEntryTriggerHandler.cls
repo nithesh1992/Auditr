@@ -1,12 +1,11 @@
 /**
- * @description Enforces attribution stamping, source-field immutability, and delete protection on Auditr_Entry__c.
+ * @description Enforces attribution stamping and blocks edits/deletes of source fields through normal use on Auditr_Entry__c.
  */
 public with sharing class AuditrEntryTriggerHandler {
-    public static final String IMMUTABLE_SOURCE_ERROR = 'Auditr Entry source and attribution fields are immutable after creation. Only Category and Risk Level may be reclassified.';
-    public static final String DELETE_BLOCKED_ERROR = 'Auditr Entry records are immutable audit evidence and cannot be deleted outside an authorized retention purge.';
+    public static final String IMMUTABLE_SOURCE_ERROR = 'Auditr Entry source and attribution fields cannot be modified after creation. Only Category and Risk Level may be reclassified.';
+    public static final String DELETE_BLOCKED_ERROR = 'Auditr Entry records cannot be deleted outside an authorized retention purge.';
 
-    /** @description Scoped flag enabled only inside AuditrPurgeBatch.execute(). */
-    public static Boolean allowPurgeDelete = false;
+    private static Boolean allowPurgeDelete = false;
 
     private static final List<Schema.SObjectField> IMMUTABLE_FIELDS = new List<Schema.SObjectField>{
         Auditr_Entry__c.Source__c,
@@ -37,6 +36,23 @@ public with sharing class AuditrEntryTriggerHandler {
             when BEFORE_DELETE {
                 beforeDelete((List<Auditr_Entry__c>) Trigger.old);
             }
+        }
+    }
+
+    /**
+     * @description Deletes expired audit records only when AuditrPurgeBatch.execute is on the call stack.
+     * Stack inspection happens prior to DML because Apex truncates getStackTraceString() at the Trigger boundary.
+     * @param scope Expired Auditr_Entry__c records to delete.
+     */
+    public static void deleteFromPurgeBatch(List<SObject> scope) {
+        if (scope == null || scope.isEmpty()) {
+            return;
+        }
+        allowPurgeDelete = new DmlException().getStackTraceString().contains('AuditrPurgeBatch.execute');
+        try {
+            Database.delete(scope, false, AccessLevel.SYSTEM_MODE);
+        } finally {
+            allowPurgeDelete = false;
         }
     }
 

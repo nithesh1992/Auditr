@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Auditr"
   text: "Long-term, classified Setup Audit Trail."
-  tagline: "Retain SetupAuditTrail beyond 180 days inside your org. Automatically classify every admin and metadata change by risk level and domain, investigate incidents by timestamp, and enforce tamper-resistant audit records."
+  tagline: "Covers Setup Audit Trail (SetupAuditTrail) only — retaining history beyond 180 days inside your org. Classify setup changes by risk level and domain, investigate incidents by timestamp, and block edits and deletes through normal use."
   image:
     src: /auditr-logo.svg
     alt: Auditr
@@ -29,8 +29,8 @@ features:
     details: Ships with 36 Auditr_Rule__mdt rules across Critical, High, Medium, and Low risk levels and 6 security domains, evaluated in priority order.
   - title: Incident Mode Investigator
     details: Pinpoint what changed in your org within ±15m to ±4h of an outage or security incident with one-click filtering for Critical & High risk actions.
-  - title: Tamper-Resistant Provenance
-    details: AuditrEntryTrigger blocks manual edits and deletions of audit provenance while tracking full field history and controlled reclassification.
+  - title: Blocks Edits & Deletes in Normal Use
+    details: AuditrEntryTrigger blocks manual edits to source fields and blocks deletes unless AuditrPurgeBatch.execute is on the call stack.
   - title: Impersonation & Delegate Attribution
     details: Automatically resolves Responsible_Username__c and flags Is_Impersonated__c when changes are executed via delegated admin or "Log in As".
   - title: Operational Control Center
@@ -98,4 +98,9 @@ AuditrController.scheduleDailyPurge(3);
 | **Impersonation / Login-As attribution** | **`Is_Impersonated__c` + `Responsible_Username__c`** | Raw `DelegateUser` column |
 | **Incident time-window investigator** | **Built-in Incident Mode (`±15m` to `±4h`)** | Manual CSV grep |
 | **Native Lightning Reports & Dashboards** | **6 reports + 6-widget Security Dashboard included** | Not supported on `SetupAuditTrail` |
-| **Tamper protection** | **Trigger-enforced immutability + Field History** | System read-only |
+| **Edit & delete protection** | **Blocks edits/deletes through normal use + Field History** | System read-only |
+
+## Roadmap
+
+- **Export to external systems**: Offloading classified `Auditr_Entry__c` records to an external system or object storage prior to retention purge (planned roadmap item, not a current feature).
+- **AI-assisted Incident Mode narratives**: Grouping multi-day audit windows into per-actor trail stories to speed up root-cause triage.

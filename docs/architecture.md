@@ -45,9 +45,9 @@ flowchart LR
 2. **Idempotent Upsert (`Source_Record_Id__c`)**:
    - Maps `String.valueOf(SetupAuditTrail.Id)` into `Auditr_Entry__c.Source_Record_Id__c` (`External ID`, `Unique`, `Case Insensitive`).
    - Uses `Database.upsert(entries, Auditr_Entry__c.Source_Record_Id__c, false, AccessLevel.SYSTEM_MODE)` so overlapping windows never create duplicates.
-3. **Immutability Guard (`AuditrEntryTrigger` & `AuditrEntryTriggerHandler`)**:
-   - **`before delete`**: Blocks all user and API deletions unless `AuditrEntryTriggerHandler.allowPurgeDelete` is explicitly set within `AuditrPurgeBatch.execute()`.
-   - **`before update`**: Blocks any modification to immutable provenance fields (`Source__c`, `Source_Record_Id__c`, `Occurred_At__c`, `Actor__c`, `Actor_Username__c`, `Delegate_User__c`, `Responsible_Username__c`, `Actor_Context__c`, `Action_Code__c`, `Section__c`, `Namespace_Prefix__c`, `Display__c`). Even `Category__c` and `Risk_Level__c` can only be updated when `AuditrEntryTriggerHandler.allowReclassificationUpdate` is enabled by `AuditrReclassifyBatch` or the `auditrRecordDetail` reclassification action.
+3. **Edit & Delete Protection (`AuditrEntryTrigger` & `AuditrEntryTriggerHandler`)**:
+   - **`before delete`**: Blocks deletions through normal use unless `new DmlException().getStackTraceString().contains('AuditrPurgeBatch.execute')`, tying deletion directly to `AuditrPurgeBatch`'s execution context without a public static flag.
+   - **`before update`**: Blocks any modification to source and attribution fields (`Source__c`, `Source_Record_Id__c`, `Occurred_At__c`, `Actor__c`, `Actor_Username__c`, `Delegate_User__c`, `Responsible_Username__c`, `Actor_Context__c`, `Action_Code__c`, `Section__c`, `Namespace_Prefix__c`, `Display__c`), allowing only `Category__c` and `Risk_Level__c` to be reclassified.
 
 ---
 

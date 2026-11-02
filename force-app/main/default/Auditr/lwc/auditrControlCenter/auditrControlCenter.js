@@ -60,6 +60,8 @@ export default class AuditrControlCenter extends LightningElement {
         totalEntries: 0,
         unclassifiedEntries: 0,
         lastSyncedOccurredAt: null,
+        lastSyncJobStatus: null,
+        lastSyncJobCompletedAt: null,
         isScheduled: false,
         scheduledSyncHour: 2,
         nextFireTime: null,
@@ -85,6 +87,30 @@ export default class AuditrControlCenter extends LightningElement {
 
     get engineStatusLabel() {
         return this.status.isActive ? 'Active' : 'Paused';
+    }
+
+    get lastSyncJobLabel() {
+        return this.status.lastSyncJobStatus || 'No Sync Run';
+    }
+
+    get newestEntryAgeLabel() {
+        if (!this.status.lastSyncedOccurredAt) {
+            return 'None';
+        }
+        const occurredMs = new Date(this.status.lastSyncedOccurredAt).getTime();
+        if (Number.isNaN(occurredMs)) {
+            return 'None';
+        }
+        const diffMinutes = Math.max(0, Math.floor((Date.now() - occurredMs) / 60000));
+        if (diffMinutes < 60) {
+            return `${diffMinutes}m ago`;
+        }
+        const diffHours = Math.floor(diffMinutes / 60);
+        if (diffHours < 24) {
+            return `${diffHours}h ${diffMinutes % 60}m ago`;
+        }
+        const diffDays = Math.floor(diffHours / 24);
+        return `${diffDays}d ${diffHours % 24}h ago`;
     }
 
     get scheduleStatusLabel() {

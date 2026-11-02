@@ -36,17 +36,12 @@ public with sharing class AuditrPurgeBatch implements Database.Batchable<SObject
     }
 
     /**
-     * @description Temporarily unlocks AuditrEntryTriggerHandler.allowPurgeDelete to delete expired audit rows.
+     * @description Deletes expired audit rows; AuditrEntryTriggerHandler permits delete only when called from AuditrPurgeBatch.execute.
      * @param context BatchableContext provided by the platform.
      * @param scope Chunk of expired Auditr_Entry__c records.
      */
     public void execute(Database.BatchableContext context, List<SObject> scope) {
-        AuditrEntryTriggerHandler.allowPurgeDelete = true;
-        try {
-            Database.delete(scope, false, AccessLevel.SYSTEM_MODE);
-        } finally {
-            AuditrEntryTriggerHandler.allowPurgeDelete = false;
-        }
+        AuditrEntryTriggerHandler.deleteFromPurgeBatch(scope);
     }
 
     /**

@@ -12,7 +12,7 @@
 
 **Documentation:** <https://nithesh1992.github.io/Auditr/>
 
-**Long-term, classified Setup Audit Trail history inside your org.** Auditr incrementally syncs `SetupAuditTrail` into tamper-resistant `Auditr_Entry__c` records, classifies every admin and metadata change by risk level and security domain using Custom Metadata rules, and gives admins an **Incident Mode** time-window investigator, an operational **Control Center**, native Lightning reports, and a security dashboard.
+**Long-term, classified Setup Audit Trail history inside your org.** Auditr covers **Setup Audit Trail (`SetupAuditTrail`) only**. It incrementally syncs `SetupAuditTrail` into `Auditr_Entry__c` records, blocks edits and deletes through normal use, classifies each setup change by risk level and security domain using Custom Metadata rules, and gives admins an **Incident Mode** time-window investigator, an operational **Control Center**, native Lightning reports, and a security dashboard.
 
 **Classified fields on `Auditr_Entry__c`:**
 
@@ -43,14 +43,15 @@ Display__c:              Assigned Permission Set "Modify_All_Data" to user john.
 
 ## What Auditr does
 
+- **Covers Setup Audit Trail (`SetupAuditTrail`) only.** Auditr tracks org configuration and metadata changes recorded in `SetupAuditTrail` (it does not track business-object record edits, LoginHistory, or Event Monitoring).
 - **Retains Setup Audit Trail beyond 180 days.** `AuditrSyncBatch` incrementally syncs `SetupAuditTrail` using an indexed `Source_Record_Id__c` external ID watermark (`Database.upsert(..., Source_Record_Id__c, false)`) with a 1-hour overlap buffer so duplicate rows are never created and late-committed setup events are never missed.
-- **Tamper-resistant records.** `AuditrEntryTrigger` blocks `before delete` entirely (unless invoked by `AuditrPurgeBatch`) and blocks `before update` on every provenance field, allowing updates only to `Category__c` and `Risk_Level__c` during an authorized reclassification.
+- **Blocks edits and deletes through normal use.** `AuditrEntryTrigger` blocks `before delete` unless `AuditrPurgeBatch.execute` is on the call stack, and blocks `before update` on all source/provenance fields so only `Category__c` and `Risk_Level__c` can be reclassified.
 - **Metadata-driven classification.** Ships with 36 `Auditr_Rule__mdt` rules (`Equals`, `StartsWith`, `Contains`, `NotBlank`) evaluated in `Priority__c` order across `Critical`, `High`, `Medium`, and `Low` risk levels and 6 domain categories (`Security & Access`, `Users & Sessions`, `Code & Automation`, `Data & Schema`, `Org Preferences`, `Packages & Integrations`).
 - **Impersonation & delegate tracking.** Automatically computes `Is_Impersonated__c` and `Responsible_Username__c` when changes are made via delegated admin or *Log in As*.
 - **At-a-Glance + Incident Mode (`auditrAtAGlance`).** 6-KPI rolling summary strip (`Total Events`, `Critical & High`, `Security & Access`, `Automation & Code`, `Impersonated`, `Unclassified`) with compact numbers (`25K`, `1.5M`), window filters (up to 1 year), and an expandable **Incident Mode** investigator (`±15m` to `±4h` around an incident timestamp).
-- **Custom Read-Only Detail Component (`auditrRecordDetail`).** Enforces immutable audit provenance with zero inline editing pencils while allowing authorized admins to reclassify Risk Level & Category in a dedicated modal.
+- **Custom Read-Only Detail Component (`auditrRecordDetail`).** Renders source provenance fields read-only with no inline editing pencils while allowing admins to reclassify Risk Level & Category in a dedicated modal.
 - **Field History Tracking.** Built-in field history tracking across audit entry fields with a dedicated `Histories` tab on the record page.
-- **Control Center (`auditrControlCenter`).** Run **Sync Now**, schedule daily automated sync and daily retention purge side-by-side, trigger **Reclassify Unclassified** or **Reclassify All**, run **Retention Purge** on demand, inspect top unclassified setup actions (last 30 days), monitor recent batch runs, and search active classification rules.
+- **Control Center (`auditrControlCenter`).** Shows the last `AsyncApexJob` status and completed time for `AuditrSyncBatch` alongside the age of the newest entry's `Occurred_At__c`, lets admins run **Sync Now**, schedule daily sync and daily retention purge side-by-side, trigger **Reclassify Unclassified** or **Reclassify All**, run **Retention Purge**, inspect top unclassified setup actions (last 30 days), and search active classification rules.
 - **Reports & Security Dashboard.** 6 pre-built reports and a 6-widget `Auditr_Security_Dashboard` embedded directly on the **Auditr Home** page.
 
 ---
@@ -65,7 +66,7 @@ Display__c:              Assigned Permission Set "Modify_All_Data" to user john.
 | **Impersonation / Login-As attribution** | **`Is_Impersonated__c` + `Responsible_Username__c`** | Raw `DelegateUser` column |
 | **Incident time-window investigator** | **Built-in Incident Mode (`±15m` to `±4h`)** | Manual CSV grep |
 | **Native Lightning Reports & Dashboards** | **6 reports + 6-widget Security Dashboard** | Not supported on `SetupAuditTrail` |
-| **Tamper protection** | **Trigger-enforced immutability + Field History** | System read-only |
+| **Edit & delete protection** | **Blocks edits/deletes through normal use + Field History** | System read-only |
 
 ---
 
@@ -75,7 +76,7 @@ By default, Auditr retains all `Auditr_Entry__c` records indefinitely (`Enable_P
 
 - **`Auditr_Setting__mdt.Enable_Purge__c`**: Boolean toggle controlling whether expired records can be purged (default: `false`).
 - **`Auditr_Setting__mdt.Retention_Days__c`**: Retention threshold in days (default: `720`). Records where `Occurred_At__c < (NOW - Retention_Days)` become eligible for deletion when `Enable_Purge__c` is `true`.
-- **Controlled Immutability Bypass**: `AuditrEntryTrigger` prevents deletion by any user. Only `AuditrPurgeBatch` can delete expired rows by explicitly setting `AuditrEntryTriggerHandler.allowPurgeDelete = true` within its execution scope.
+- **Call-Stack-Gated Purge**: `AuditrEntryTrigger` blocks `before delete` unless `new DmlException().getStackTraceString().contains('AuditrPurgeBatch.execute')`, tying deletion directly to `AuditrPurgeBatch`'s execution context without a public static flag.
 - **Scheduled Daily Purge (Control Center)**: Pick a **Daily Purge Hour (Org Time Zone)** in the red schedule card and click **Schedule Daily Purge** directly in the Control Center (or click **Run Retention Purge** in the header for an immediate one-off run).
 - **Scheduled Purge via Apex**:
   ```apex
@@ -86,10 +87,19 @@ By default, Auditr retains all `Auditr_Entry__c` records indefinitely (`Enable_P
 
 ## Known limitations
 
+- **Covers Setup Audit Trail (`SetupAuditTrail`) only.** Auditr does not capture standard/custom object record changes, LoginHistory, or Event Monitoring logs.
+- **Blocks edits and deletes through normal use (not cryptographic immutability).** A user with permission to disable triggers or modify Apex in the org could still alter or remove records.
 - **Near-real-time batch sync (not streaming).** `SetupAuditTrail` does not support Apex triggers or Change Data Capture. Auditr ingests entries via `AuditrSyncBatch` on a daily schedule or when an admin clicks **Sync Now**.
 - **Initial backfill is bounded by Salesforce's 180-day `SetupAuditTrail` window.** On the day you install Auditr, `SetupAuditTrail` only holds the last 180 days of history. Multi-year retention accumulates forward from the date of installation.
 - **Custom Object storage consumption.** Each `Auditr_Entry__c` record consumes standard Salesforce data storage (~2 KB per record). Use `Enable_Purge__c` and `Retention_Days__c` in `Auditr_Setting__mdt` to manage storage growth in high-volume orgs.
 - **Defensive LDV query caps.** To keep UI components responsive in orgs with large audit volumes, `AuditrController` caps KPI count queries (`25,000` for total counts, `5,000` per category/risk KPI, and `10,000` for 30-day unclassified aggregation).
+
+---
+
+## Roadmap
+
+- **Export to external systems**: Offloading classified `Auditr_Entry__c` records to an external system / SIEM or object storage prior to retention purge (planned roadmap item, not currently implemented).
+- **AI-assisted Incident Mode narratives**: Grouping multi-day audit windows into per-actor trail stories to speed up root-cause triage.
 
 ---
 
