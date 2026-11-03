@@ -126,6 +126,18 @@ export default class AuditrControlCenter extends LightningElement {
             : `Purge > ${this.status.retentionDays}d (Not Scheduled)`;
     }
 
+    get isPurgeConfigured() {
+        return Boolean(this.status.enablePurge && this.status.retentionDays && this.status.retentionDays > 0);
+    }
+
+    get showPurgeSchedule() {
+        return this.isPurgeConfigured || this.status.isPurgeScheduled;
+    }
+
+    get scheduleGridClass() {
+        return this.showPurgeSchedule ? 'schedule-grid' : 'schedule-grid schedule-grid-single';
+    }
+
     get showNextPurgeTime() {
         return Boolean(this.status.enablePurge && this.status.isPurgeScheduled && this.status.nextPurgeFireTime);
     }

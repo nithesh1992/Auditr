@@ -112,5 +112,36 @@ describe('c-auditr-control-center', () => {
         await flushPromises();
 
         expect(runSyncNow).toHaveBeenCalledTimes(1);
+
+        const purgeBox = element.shadowRoot.querySelector('.schedule-box-purge');
+        expect(purgeBox).toBeNull();
+    });
+
+    it('renders purge schedule controls when retention policy is enabled and configured', async () => {
+        const element = createElement('c-auditr-control-center', { is: AuditrControlCenter });
+        document.body.appendChild(element);
+
+        getControlCenterStatus.emit({
+            isActive: true,
+            backfillDays: 180,
+            batchSize: 200,
+            enablePurge: true,
+            retentionDays: 365,
+            preferredSyncHour: 2,
+            totalEntries: 120,
+            unclassifiedEntries: 0,
+            lastSyncedOccurredAt: '2026-10-31T15:00:00.000Z',
+            isScheduled: false,
+            isPurgeScheduled: false,
+            scheduledPurgeHour: 3,
+            recentJobs: [],
+            activeRules: [],
+            topUnclassifiedActions: []
+        });
+
+        await flushPromises();
+
+        const purgeBox = element.shadowRoot.querySelector('.schedule-box-purge');
+        expect(purgeBox).not.toBeNull();
     });
 });

@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<CustomTab xmlns="http://soap.sforce.com/2006/04/metadata">
-    <description>Time-window radius investigator (±15m to ±12h) for live outage triage around an incident timestamp.</description>
-    <flexiPage>Auditr_Incident_Mode</flexiPage>
-    <label>Incident Mode</label>
-    <motif>Custom25: Clock</motif>
-</CustomTab>

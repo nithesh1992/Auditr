@@ -176,8 +176,4 @@
         <tab>Auditr_Home</tab>
         <visibility>Visible</visibility>
     </tabSettings>
-    <tabSettings>
-        <tab>Auditr_Incident_Mode</tab>
-        <visibility>Visible</visibility>
-    </tabSettings>
 </PermissionSet>

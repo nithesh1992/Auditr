@@ -27,6 +27,31 @@ public with sharing class AuditrChangeLogController {
         @AuraEnabled public Boolean isPackagingInFlight;
     }
 
+    /** @description User summary for user lookup resolution in Audit Mode. */
+    public class UserLookupDTO {
+        @AuraEnabled public Id userId;
+        @AuraEnabled public String name;
+        @AuraEnabled public String username;
+    }
+
+    /** @description Audit entry row with packaging citation and risk metadata for Audit Mode. */
+    public class AuditEntryDTO {
+        @AuraEnabled public Id recordId;
+        @AuraEnabled public String name;
+        @AuraEnabled public DateTime occurredAt;
+        @AuraEnabled public String riskLevel;
+        @AuraEnabled public String category;
+        @AuraEnabled public String section;
+        @AuraEnabled public String actionCode;
+        @AuraEnabled public String responsibleUsername;
+        @AuraEnabled public String delegateUser;
+        @AuraEnabled public String displayText;
+        @AuraEnabled public Boolean isPackaged;
+        @AuraEnabled public String changeRequestId;
+        @AuraEnabled public String changeLogName;
+        @AuraEnabled public Id changeLogId;
+    }
+
     /** @description Unassigned audit entry row eligible for packaging. */
     public class UnassignedEntryDTO {
         @AuraEnabled public Id recordId;
@@ -109,6 +134,173 @@ public with sharing class AuditrChangeLogController {
             rows.add(dto);
         }
         return rows;
+    }
+
+    /**
+     * @description Resolves user details by Id or Username for Audit Mode user lookup.
+     * @param userId Optional User Id.
+     * @param username Optional User Username.
+     * @return UserLookupDTO with userId, name, and username, or null if not found.
+     */
+    @AuraEnabled(cacheable=true)
+    public static UserLookupDTO resolveUser(Id userId, String username) {
+        if (userId == null && String.isBlank(username)) {
+            return null;
+        }
+        List<User> users;
+        if (userId != null) {
+            users = [SELECT Id, Name, Username FROM User WHERE Id = :userId WITH USER_MODE LIMIT 1];
+        } else {
+            String cleanUsername = username.trim();
+            users = [SELECT Id, Name, Username FROM User WHERE Username = :cleanUsername WITH USER_MODE LIMIT 1];
+        }
+        if (users.isEmpty()) {
+            return null;
+        }
+        UserLookupDTO dto = new UserLookupDTO();
+        dto.userId = users[0].Id;
+        dto.name = users[0].Name;
+        dto.username = users[0].Username;
+        return dto;
+    }
+
+    /**
+     * @description Returns all audit entries matching the window, actor, and risk criteria, with packaging citations.
+     * @param windowStart Inclusive Occurred_At__c lower bound (defaults to System.now() - 30 days).
+     * @param windowEnd Inclusive Occurred_At__c upper bound (defaults to System.now()).
+     * @param actorUsername Optional exact Responsible_Username__c filter.
+     * @param highRiskOnly When true, filters to Critical and High risk entries only.
+     * @return Up to 200 AuditEntryDTO rows newest-first.
+     */
+    @AuraEnabled(cacheable=true)
+    public static List<AuditEntryDTO> getAuditEntries(DateTime windowStart, DateTime windowEnd, String actorUsername, Boolean highRiskOnly) {
+        DateTime effectiveStart = resolveWindowStart(windowStart);
+        DateTime effectiveEnd = resolveWindowEnd(windowEnd);
+        String actor = normalizeActor(actorUsername);
+        List<String> allowedRisks = (highRiskOnly == true) ? new List<String>{ 'Critical', 'High' } : null;
+
+        List<Auditr_Entry__c> entries;
+        if (actor == null && allowedRisks == null) {
+            entries = [
+                SELECT Id, Name, Occurred_At__c, Risk_Level__c, Category__c, Section__c, Action_Code__c, Responsible_Username__c, Delegate_User__c, Display__c,
+                       (SELECT Id, Change_Log__c, Change_Log__r.Name, Change_Log__r.Change_Request_Id__c, Change_Log__r.Status__c FROM Auditr_Change_Log_Items__r ORDER BY CreatedDate DESC LIMIT 1)
+                FROM Auditr_Entry__c
+                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
+                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :ENTRY_QUERY_LIMIT
+            ];
+        } else if (actor != null && allowedRisks == null) {
+            entries = [
+                SELECT Id, Name, Occurred_At__c, Risk_Level__c, Category__c, Section__c, Action_Code__c, Responsible_Username__c, Delegate_User__c, Display__c,
+                       (SELECT Id, Change_Log__c, Change_Log__r.Name, Change_Log__r.Change_Request_Id__c, Change_Log__r.Status__c FROM Auditr_Change_Log_Items__r ORDER BY CreatedDate DESC LIMIT 1)
+                FROM Auditr_Entry__c
+                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
+                  AND Responsible_Username__c = :actor
+                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :ENTRY_QUERY_LIMIT
+            ];
+        } else if (actor == null && allowedRisks != null) {
+            entries = [
+                SELECT Id, Name, Occurred_At__c, Risk_Level__c, Category__c, Section__c, Action_Code__c, Responsible_Username__c, Delegate_User__c, Display__c,
+                       (SELECT Id, Change_Log__c, Change_Log__r.Name, Change_Log__r.Change_Request_Id__c, Change_Log__r.Status__c FROM Auditr_Change_Log_Items__r ORDER BY CreatedDate DESC LIMIT 1)
+                FROM Auditr_Entry__c
+                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
+                  AND Risk_Level__c IN :allowedRisks
+                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :ENTRY_QUERY_LIMIT
+            ];
+        } else {
+            entries = [
+                SELECT Id, Name, Occurred_At__c, Risk_Level__c, Category__c, Section__c, Action_Code__c, Responsible_Username__c, Delegate_User__c, Display__c,
+                       (SELECT Id, Change_Log__c, Change_Log__r.Name, Change_Log__r.Change_Request_Id__c, Change_Log__r.Status__c FROM Auditr_Change_Log_Items__r ORDER BY CreatedDate DESC LIMIT 1)
+                FROM Auditr_Entry__c
+                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
+                  AND Responsible_Username__c = :actor
+                  AND Risk_Level__c IN :allowedRisks
+                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :ENTRY_QUERY_LIMIT
+            ];
+        }
+
+        List<AuditEntryDTO> rows = new List<AuditEntryDTO>();
+        for (Auditr_Entry__c entry : entries) {
+            AuditEntryDTO dto = new AuditEntryDTO();
+            dto.recordId = entry.Id;
+            dto.name = entry.Name;
+            dto.occurredAt = entry.Occurred_At__c;
+            dto.riskLevel = entry.Risk_Level__c;
+            dto.category = entry.Category__c;
+            dto.section = entry.Section__c;
+            dto.actionCode = entry.Action_Code__c;
+            dto.responsibleUsername = entry.Responsible_Username__c;
+            dto.delegateUser = entry.Delegate_User__c;
+            dto.displayText = entry.Display__c;
+            if (!entry.Auditr_Change_Log_Items__r.isEmpty()) {
+                dto.isPackaged = true;
+                dto.changeLogId = entry.Auditr_Change_Log_Items__r[0].Change_Log__c;
+                dto.changeLogName = entry.Auditr_Change_Log_Items__r[0].Change_Log__r.Name;
+                dto.changeRequestId = entry.Auditr_Change_Log_Items__r[0].Change_Log__r.Change_Request_Id__c;
+            } else {
+                dto.isPackaged = false;
+                dto.changeLogId = null;
+                dto.changeLogName = null;
+                dto.changeRequestId = null;
+            }
+            rows.add(dto);
+        }
+        return rows;
+    }
+
+    /**
+     * @description Searches open Draft change logs by Change Request Id or Name for the packaging modal.
+     * @param searchTerm Optional substring search on Change_Request_Id__c or Name.
+     * @return Up to 20 matching ChangeLogDTO records.
+     */
+    @AuraEnabled(cacheable=true)
+    public static List<ChangeLogDTO> searchDraftChangeLogs(String searchTerm) {
+        String clean = (searchTerm == null) ? '' : searchTerm.trim();
+        List<Auditr_Change_Log__c> records;
+        if (String.isBlank(clean)) {
+            records = [
+                SELECT Id, Name, Change_Request_Id__c, Status__c, Target_Actor__c, Window_Start__c, Window_End__c,
+                       Deployment_Date__c, Total_Entries__c, Signed_Off_At__c, Packaging_Job_Id__c
+                FROM Auditr_Change_Log__c
+                WHERE Status__c = :AuditrChangeLogTriggerHandler.STATUS_DRAFT
+                WITH USER_MODE ORDER BY CreatedDate DESC LIMIT 20
+            ];
+        } else {
+            String pattern = '%' + String.escapeSingleQuotes(clean) + '%';
+            records = [
+                SELECT Id, Name, Change_Request_Id__c, Status__c, Target_Actor__c, Window_Start__c, Window_End__c,
+                       Deployment_Date__c, Total_Entries__c, Signed_Off_At__c, Packaging_Job_Id__c
+                FROM Auditr_Change_Log__c
+                WHERE Status__c = :AuditrChangeLogTriggerHandler.STATUS_DRAFT
+                  AND (Name LIKE :pattern OR Change_Request_Id__c LIKE :pattern)
+                WITH USER_MODE ORDER BY CreatedDate DESC LIMIT 20
+            ];
+        }
+
+        Set<String> candidateJobIds = new Set<String>();
+        for (Auditr_Change_Log__c log : records) {
+            if (String.isNotBlank(log.Packaging_Job_Id__c)) {
+                candidateJobIds.add(log.Packaging_Job_Id__c);
+            }
+        }
+        Set<String> runningJobIds = queryRunningJobIds(candidateJobIds);
+
+        List<ChangeLogDTO> logs = new List<ChangeLogDTO>();
+        for (Auditr_Change_Log__c log : records) {
+            ChangeLogDTO dto = new ChangeLogDTO();
+            dto.recordId = log.Id;
+            dto.name = log.Name;
+            dto.changeRequestId = log.Change_Request_Id__c;
+            dto.status = log.Status__c;
+            dto.targetActor = log.Target_Actor__c;
+            dto.windowStart = log.Window_Start__c;
+            dto.windowEnd = log.Window_End__c;
+            dto.deploymentDate = log.Deployment_Date__c;
+            dto.totalEntries = Integer.valueOf(log.Total_Entries__c ?? 0);
+            dto.signedOffAt = log.Signed_Off_At__c;
+            dto.isPackagingInFlight = String.isNotBlank(log.Packaging_Job_Id__c) && runningJobIds.contains(log.Packaging_Job_Id__c);
+            logs.add(dto);
+        }
+        return logs;
     }
 
     /**

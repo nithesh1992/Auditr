@@ -12,7 +12,7 @@
 
 **Documentation:** <https://nithesh1992.github.io/Auditr/>
 
-**Long-term, classified Setup Audit Trail history inside your org — now with compliance change packaging.** Auditr covers **Setup Audit Trail (`SetupAuditTrail`) only**. It incrementally syncs `SetupAuditTrail` into `Auditr_Entry__c` records, blocks edits and deletes through normal use, classifies each setup change by risk level and security domain using Custom Metadata rules, and organizes work into four dedicated tabs: **Auditr Home** (posture KPIs + dashboard), **Incident Mode** (time-window investigator), **Audit Mode** (compliance change packaging into sealed, CR-bound change logs), and the **Control Center** (sync, retention, and rule operations).
+**Long-term, classified Setup Audit Trail history inside your org — now with compliance change packaging.** Auditr covers **Setup Audit Trail (`SetupAuditTrail`) only**. It incrementally syncs `SetupAuditTrail` into `Auditr_Entry__c` records, blocks edits and deletes through normal use, classifies each setup change by risk level and security domain using Custom Metadata rules, and organizes work into focused tabs: **Auditr Home** (posture KPIs + dashboard), **Audit Mode** (unified incident investigation, actor bursts, and compliance change packaging into sealed, CR-bound change logs), **Auditr Control Center** (sync, retention, and rule operations), and **Change Logs** (lifecycle and sign-offs).
 
 **Classified fields on `Auditr_Entry__c`:**
 
@@ -113,14 +113,14 @@ By default, Auditr retains all `Auditr_Entry__c` records indefinitely (`Enable_P
 
 ## Install
 
-**Unlocked package (`Auditr@1.0.0-2`)**
+**Unlocked package (`Auditr@1.1.0-1`)**
 
 ```bash
-sf package install --package 04tg7000000cltxAAA --target-org <alias> --wait 10
+sf package install --package 04tg7000000coevAAA --target-org <alias> --wait 10
 ```
 
-Production: <https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cltxAAA>  
-Sandbox: <https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cltxAAA>
+Production: <https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000coevAAA>  
+Sandbox: <https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000coevAAA>
 
 **From source**
 

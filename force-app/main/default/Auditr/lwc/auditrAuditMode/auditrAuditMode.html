@@ -3,15 +3,9 @@
         <!-- Card Header -->
         <div class="card-header">
             <div class="header-title">
-                <h2 class="title-text">Audit Mode — Change Packaging &amp; Compliance Sign-off</h2>
+                <h2 class="title-text">Audit Mode — Investigation &amp; Change Packaging</h2>
             </div>
             <div class="header-actions">
-                <lightning-button
-                    label="New Change Log"
-                    icon-name="utility:add"
-                    variant="brand"
-                    onclick={handleOpenCreateModal}
-                ></lightning-button>
                 <lightning-button-icon
                     icon-name="utility:refresh"
                     alternative-text="Refresh Audit Mode"
@@ -32,181 +26,289 @@
             </div>
         </template>
 
-        <!-- Change Logs Section -->
-        <div class="section-header">
-            <h3 class="slds-text-heading_small">Change Logs</h3>
-            <span class="slds-text-body_small slds-text-color_weak">Packaging target: <strong>{selectedLogLabel}</strong></span>
-        </div>
-
-        <template lwc:if={hasChangeLogs}>
-            <lightning-datatable
-                key-field="recordId"
-                data={changeLogs}
-                columns={logColumns}
-                max-row-selection="1"
-                onrowselection={handleLogSelection}
-            ></lightning-datatable>
-        </template>
-        <template lwc:else>
-            <p class="slds-text-body_small slds-text-color_weak slds-p-vertical_x-small">
-                No change logs yet. Click <strong>New Change Log</strong> to bundle audit entries against an approved Change Request.
-            </p>
-        </template>
-
-        <div class="section-divider"></div>
-
-        <!-- Unassigned Backlog Section -->
-        <div class="section-header">
-            <h3 class="slds-text-heading_small">Unassigned Changes Backlog</h3>
-            <span class="slds-text-body_small slds-text-color_weak" title="Entries with no change log citation (count capped at 25,000)">
-                {formattedBacklogCount} unpackaged change(s) match the current filter
-            </span>
-        </div>
-        <p class="slds-text-body_small slds-text-color_weak slds-m-bottom_small">
-            Changes outside an approved Change Request are compliance exceptions under SOX ITGC / SOC 2. Package them into a change log to attest that they are covered.
-        </p>
-
-        <div class="filter-controls">
-            <div class="filter-input">
-                <lightning-input
-                    type="datetime"
-                    name="windowStart"
-                    label="Occurred From"
-                    value={windowStartInput}
-                    onchange={handleWindowStartChange}
-                ></lightning-input>
+        <!-- Unified Investigation Filter Bar -->
+        <div class="filter-panel">
+            <div class="time-mode-selector slds-m-bottom_small">
+                <lightning-radio-group
+                    name="timeMode"
+                    label="Investigation Time Mode"
+                    options={timeModeOptions}
+                    value={timeMode}
+                    type="button"
+                    onchange={handleTimeModeChange}
+                ></lightning-radio-group>
             </div>
-            <div class="filter-input">
-                <lightning-input
-                    type="datetime"
-                    name="windowEnd"
-                    label="Occurred To"
-                    value={windowEndInput}
-                    onchange={handleWindowEndChange}
-                ></lightning-input>
-            </div>
-            <div class="filter-input">
-                <lightning-input
-                    type="text"
-                    name="actor"
-                    label="Responsible Actor (exact)"
-                    placeholder="admin@example.com"
-                    value={actorInput}
-                    onchange={handleActorChange}
-                ></lightning-input>
-            </div>
-            <div class="filter-action">
-                <lightning-button
-                    label="Apply Filters"
-                    variant="brand"
-                    icon-name="utility:filter"
-                    onclick={handleApplyFilters}
-                ></lightning-button>
-            </div>
-            <div class="filter-action">
-                <lightning-input
-                    type="toggle"
-                    label="Group Actor Bursts"
-                    name="groupBursts"
-                    checked={groupBursts}
-                    message-toggle-active="Grouped"
-                    message-toggle-inactive="Flat"
-                    onchange={handleBurstToggle}
-                ></lightning-input>
-            </div>
-        </div>
 
-        <div class="package-actions">
-            <lightning-button
-                label={packageSelectedLabel}
-                variant="neutral"
-                icon-name="utility:package"
-                onclick={handlePackageSelected}
-                disabled={packageSelectedDisabled}
-            ></lightning-button>
-            <lightning-button
-                label={packageAllLabel}
-                variant="brand"
-                icon-name="utility:package"
-                onclick={handleOpenConfirmAll}
-                disabled={packageAllDisabled}
-            ></lightning-button>
-            <template lwc:if={isPackaging}>
-                <lightning-spinner alternative-text="Queuing packaging job" size="x-small"></lightning-spinner>
-            </template>
-        </div>
-
-        <!-- Confirm Package-All Panel -->
-        <template lwc:if={isConfirmAllOpen}>
-            <div class="confirm-panel" role="alertdialog" aria-label="Confirm bulk packaging">
-                <div class="slds-media__figure">
-                    <lightning-icon icon-name="utility:warning" variant="warning" size="small" alternative-text="Confirm"></lightning-icon>
-                </div>
-                <div class="slds-media__body">
-                    <p class="slds-text-body_small">
-                        Package <strong>{formattedBacklogCount}</strong> unassigned change(s) into <strong>{selectedLogLabel}</strong>?
-                        The window and actor filter are stored on the change log for audit reproducibility. Processing runs asynchronously.
-                    </p>
-                    <div class="confirm-actions">
-                        <lightning-button label="Confirm Packaging" variant="brand" onclick={handleConfirmAll}></lightning-button>
-                        <lightning-button label="Cancel" variant="neutral" onclick={handleCancelConfirmAll}></lightning-button>
-                    </div>
-                </div>
-            </div>
-        </template>
-
-        <template lwc:if={hasEntryRows}>
-            <lightning-datatable
-                key-field="recordId"
-                data={displayedRows}
-                columns={entryColumns}
-                onrowselection={handleEntrySelection}
-            ></lightning-datatable>
-        </template>
-        <template lwc:else>
-            <p class="slds-text-body_small slds-text-color_weak slds-p-vertical_x-small">
-                No unassigned changes match the current filter. All audit events in this window are covered by change logs.
-            </p>
-        </template>
-
-        <!-- New Change Log Modal -->
-        <template lwc:if={isCreateModalOpen}>
-            <section role="dialog" tabindex="-1" aria-modal="true" aria-label="New Change Log" class="slds-modal slds-fade-in-open slds-modal_small">
-                <div class="slds-modal__container">
-                    <header class="slds-modal__header">
-                        <h2 class="slds-modal__title slds-hyphenate">New Change Log</h2>
-                    </header>
-                    <div class="slds-modal__content slds-p-around_medium">
-                        <lightning-input
-                            type="text"
-                            name="changeRequestId"
-                            label="Change Request Id"
-                            placeholder="PROJ-1234 or CHG0011223"
-                            value={newChangeRequestId}
-                            onchange={handleCrIdChange}
-                            required
-                            field-level-help="The approved CR/ticket number from your ITSM system (Jira, ServiceNow)."
-                        ></lightning-input>
+            <div class="filter-controls">
+                <template lwc:if={isWindowMode}>
+                    <div class="filter-input">
                         <lightning-input
                             type="datetime"
-                            name="deploymentDate"
-                            label="Deployment Date"
-                            value={newDeploymentDate}
-                            onchange={handleDeploymentDateChange}
-                            class="slds-m-top_small"
+                            name="windowStart"
+                            label="Occurred From"
+                            value={windowStartInput}
+                            onchange={handleWindowStartChange}
+                            required
                         ></lightning-input>
-                        <lightning-textarea
-                            name="description"
-                            label="Description"
-                            placeholder="What does this change log certify?"
-                            value={newDescription}
-                            onchange={handleDescriptionChange}
-                            class="slds-m-top_small"
-                        ></lightning-textarea>
                     </div>
+                    <div class="filter-input">
+                        <lightning-input
+                            type="datetime"
+                            name="windowEnd"
+                            label="Occurred To"
+                            value={windowEndInput}
+                            onchange={handleWindowEndChange}
+                            required
+                        ></lightning-input>
+                    </div>
+                </template>
+
+                <template lwc:if={isIncidentMode}>
+                    <div class="filter-input">
+                        <lightning-input
+                            type="datetime"
+                            name="incidentTimestamp"
+                            label="Incident Timestamp"
+                            value={incidentTimestampInput}
+                            onchange={handleIncidentTimestampChange}
+                            required
+                        ></lightning-input>
+                    </div>
+                    <div class="filter-input">
+                        <lightning-combobox
+                            name="incidentRadius"
+                            label="Window Radius"
+                            value={incidentRadiusInput}
+                            options={radiusOptions}
+                            onchange={handleIncidentRadiusChange}
+                        ></lightning-combobox>
+                    </div>
+                </template>
+
+                <div class="filter-input filter-input-user">
+                    <lightning-record-picker
+                        label="Responsible Actor"
+                        placeholder="Search users by name or username..."
+                        object-api-name="User"
+                        value={selectedUserId}
+                        display-info={userDisplayInfo}
+                        matching-info={userMatchingInfo}
+                        onchange={handleUserChange}
+                    ></lightning-record-picker>
+                    <template lwc:if={actorInput}>
+                        <p class="actor-hint slds-text-body_small slds-text-color_weak">
+                            Actor: {actorInput}
+                        </p>
+                    </template>
+                </div>
+
+                <div class="filter-action filter-toggle">
+                    <lightning-input
+                        type="toggle"
+                        label="High &amp; Critical Risk Only"
+                        name="highRiskOnly"
+                        checked={highRiskOnly}
+                        message-toggle-active="High/Critical"
+                        message-toggle-inactive="All Risks"
+                        onchange={handleHighRiskToggle}
+                    ></lightning-input>
+                </div>
+
+                <div class="filter-action filter-toggle">
+                    <lightning-input
+                        class="burst-toggle-input"
+                        type="toggle"
+                        label="Group Actor Bursts"
+                        name="groupBursts"
+                        checked={groupBursts}
+                        message-toggle-active="Grouped"
+                        message-toggle-inactive="Flat"
+                        onchange={handleBurstToggle}
+                    ></lightning-input>
+                </div>
+
+                <div class="filter-action">
+                    <lightning-button
+                        label="Apply Filters"
+                        variant="brand"
+                        icon-name="utility:filter"
+                        onclick={handleApplyFilters}
+                    ></lightning-button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scope and Packaging Action Bar -->
+        <div class="results-action-bar">
+            <div class="results-stats">
+                <span class="slds-badge slds-theme_shade stats-badge">
+                    {formattedTotalCount} event(s) found
+                </span>
+                <span class="stats-item">
+                    <strong>{formattedUnassignedCount}</strong> unassigned
+                </span>
+                <span class="stats-divider">•</span>
+                <span class="stats-item">
+                    <strong>{formattedPackagedCount}</strong> packaged
+                </span>
+            </div>
+            <div class="package-buttons">
+                <lightning-button
+                    label={packageSelectedLabel}
+                    variant="brand"
+                    icon-name="utility:package"
+                    onclick={handleOpenPackageSelectedModal}
+                    disabled={packageSelectedDisabled}
+                ></lightning-button>
+                <lightning-button
+                    label={packageAllLabel}
+                    variant="neutral"
+                    icon-name="utility:package"
+                    onclick={handleOpenPackageAllModal}
+                    disabled={packageAllDisabled}
+                ></lightning-button>
+            </div>
+        </div>
+
+        <!-- Results Table -->
+        <template lwc:if={isLoading}>
+            <div class="slds-p-vertical_large slds-is-relative">
+                <lightning-spinner alternative-text="Loading audit entries" size="small"></lightning-spinner>
+            </div>
+        </template>
+        <template lwc:else>
+            <template lwc:if={hasEntryRows}>
+                <template lwc:if={groupBursts}>
+                    <lightning-tree-grid
+                        key-field="recordId"
+                        data={treeData}
+                        columns={treeColumns}
+                        selected-rows={gridSelectedRows}
+                        onrowselection={handleTreeRowSelection}
+                    ></lightning-tree-grid>
+                </template>
+                <template lwc:else>
+                    <lightning-datatable
+                        key-field="recordId"
+                        data={displayedRows}
+                        columns={flatColumns}
+                        selected-rows={selectedEntryIds}
+                        onrowselection={handleFlatRowSelection}
+                    ></lightning-datatable>
+                </template>
+            </template>
+            <template lwc:else>
+                <div class="slds-illustration slds-illustration_small slds-p-around_large slds-text-align_center">
+                    <p class="slds-text-heading_small slds-text-color_weak">No audit events match the selected criteria</p>
+                    <p class="slds-text-body_small slds-text-color_weak slds-m-top_x-small">
+                        Adjust the time window, widen the incident radius, or clear filters to locate events.
+                    </p>
+                </div>
+            </template>
+        </template>
+
+        <!-- Packaging Modal (Scalable Modal-First Workflow) -->
+        <template lwc:if={isPackageModalOpen}>
+            <section role="dialog" tabindex="-1" aria-modal="true" aria-label="Package Changes into Change Log" class="slds-modal slds-fade-in-open slds-modal_small">
+                <div class="slds-modal__container">
+                    <header class="slds-modal__header">
+                        <h2 class="slds-modal__title slds-hyphenate">Package Changes into Change Log</h2>
+                        <p class="slds-m-top_xx-small slds-text-body_small slds-text-color_weak">
+                            Certify audit events against an approved external Change Request for SOX ITGC and SOC 2.
+                        </p>
+                    </header>
+
+                    <div class="slds-modal__content slds-p-around_medium">
+                        <!-- Scope Summary Banner -->
+                        <div class="slds-scoped-notification slds-media slds-media_center slds-theme_info slds-m-bottom_medium" role="status">
+                            <div class="slds-media__figure">
+                                <lightning-icon icon-name="utility:info" size="small" variant="inverse" alternative-text="Scope"></lightning-icon>
+                            </div>
+                            <div class="slds-media__body">
+                                <p>{packageScopeSummaryText}</p>
+                            </div>
+                        </div>
+
+                        <!-- Target Mode Choice -->
+                        <div class="slds-m-bottom_medium">
+                            <lightning-radio-group
+                                name="packageTargetMode"
+                                label="Change Log Target"
+                                options={packageTargetOptions}
+                                value={packageTargetMode}
+                                type="button"
+                                onchange={handlePackageTargetModeChange}
+                            ></lightning-radio-group>
+                        </div>
+
+                        <!-- Link to Existing Change Log -->
+                        <template lwc:if={isExistingTargetMode}>
+                            <div class="existing-log-section">
+                                <lightning-input
+                                    type="search"
+                                    label="Search Open Change Logs"
+                                    placeholder="Type Change Request Id, e.g. CR-1042..."
+                                    value={changeLogSearchTerm}
+                                    onchange={handleSearchTermChange}
+                                ></lightning-input>
+
+                                <template lwc:if={hasDraftLogs}>
+                                    <div class="slds-m-top_small">
+                                        <lightning-combobox
+                                            name="existingChangeLog"
+                                            label="Select Draft Change Log"
+                                            value={selectedModalChangeLogId}
+                                            options={draftLogOptions}
+                                            onchange={handleSelectExistingChangeLog}
+                                            required
+                                        ></lightning-combobox>
+                                    </div>
+                                </template>
+                                <template lwc:else>
+                                    <p class="slds-text-body_small slds-text-color_weak slds-m-top_small">
+                                        No open Draft change logs matched. Switch to <strong>Create New Change Log</strong> above to establish one.
+                                    </p>
+                                </template>
+                            </div>
+                        </template>
+
+                        <!-- Create New Change Log -->
+                        <template lwc:if={isCreateTargetMode}>
+                            <div class="new-log-section">
+                                <lightning-input
+                                    class="modal-cr-input"
+                                    type="text"
+                                    name="modalChangeRequestId"
+                                    label="Change Request Id"
+                                    placeholder="e.g. CR-2026-081, PRJ-104, INC-8821"
+                                    value={modalNewChangeRequestId}
+                                    onchange={handleModalCrIdChange}
+                                    required
+                                    field-level-help="The approved CR or ticket number from Jira, ServiceNow, etc."
+                                ></lightning-input>
+                                <lightning-input
+                                    type="datetime"
+                                    name="modalDeploymentDate"
+                                    label="Deployment Date"
+                                    value={modalNewDeploymentDate}
+                                    onchange={handleModalDeploymentDateChange}
+                                    class="slds-m-top_small"
+                                ></lightning-input>
+                                <lightning-textarea
+                                    name="modalDescription"
+                                    label="Description"
+                                    placeholder="Summary of release scope, approved tickets, or deployment details..."
+                                    value={modalNewDescription}
+                                    onchange={handleModalDescriptionChange}
+                                    class="slds-m-top_small"
+                                ></lightning-textarea>
+                            </div>
+                        </template>
+                    </div>
+
                     <footer class="slds-modal__footer">
-                        <lightning-button label="Cancel" variant="neutral" onclick={handleCloseCreateModal} disabled={isSavingLog}></lightning-button>
-                        <lightning-button label="Create Change Log" variant="brand" onclick={handleCreateSave} disabled={isSavingLog}></lightning-button>
+                        <lightning-button label="Cancel" variant="neutral" onclick={handleClosePackageModal} disabled={isPackaging}></lightning-button>
+                        <lightning-button label="Confirm &amp; Package" variant="brand" onclick={handleConfirmPackage} disabled={confirmPackageDisabled}></lightning-button>
                     </footer>
                 </div>
             </section>

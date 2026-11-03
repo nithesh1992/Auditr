@@ -102,6 +102,10 @@
     gap: 1rem;
 }
 
+.schedule-grid.schedule-grid-single {
+    grid-template-columns: 1fr;
+}
+
 @media (max-width: 900px) {
     .schedule-grid {
         grid-template-columns: 1fr;

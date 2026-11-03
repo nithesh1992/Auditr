@@ -7,7 +7,7 @@ You can install Auditr either as a versioned **Unlocked Package** or by deployin
 ::: code-group
 
 ```bash [Unlocked Package (Recommended)]
-sf package install --package 04tg7000000cltxAAA --wait 10 --target-org <org-alias>
+sf package install --package 04tg7000000coevAAA --wait 10 --target-org <org-alias>
 ```
 
 ```bash [Deploy from Source]
@@ -20,8 +20,8 @@ sf project deploy start --source-dir force-app/main/default/Auditr --target-org 
 
 Or install directly in the browser:
 
-- **Production / Developer Edition**: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cltxAAA`
-- **Sandbox / Scratch Org**: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cltxAAA`
+- **Production / Developer Edition**: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000coevAAA`
+- **Sandbox / Scratch Org**: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000coevAAA`
 
 ## 2. Assign Permission Sets
 
@@ -29,8 +29,8 @@ Auditr ships with two permission sets following the principle of least privilege
 
 | Permission Set | API Name | Intended Audience |
 | :--- | :--- | :--- |
-| **Auditr Admin** | `Auditr_Admin` | Security administrators and release managers. Grants access to the **Auditr** Lightning App, **Auditr Home**, **Incident Mode**, **Audit Mode** (change packaging), **Auditr Control Center**, batch execution, scheduling, and rule reclassification. |
-| **Auditr Viewer** | `Auditr_Viewer` | Compliance auditors and read-only reviewers. Grants read-only access to `Auditr_Entry__c`, `Auditr_Change_Log__c`, **Auditr Home**, **Incident Mode**, **Audit Mode**, reports, and the security dashboard without packaging or Control Center actions. |
+| **Auditr Admin** | `Auditr_Admin` | Security administrators and release managers. Grants access to the **Auditr** Lightning App, **Auditr Home**, **Audit Mode** (investigation & change packaging), **Auditr Control Center**, batch execution, scheduling, and rule reclassification. |
+| **Auditr Viewer** | `Auditr_Viewer` | Compliance auditors and read-only reviewers. Grants read-only access to `Auditr_Entry__c`, `Auditr_Change_Log__c`, **Auditr Home**, **Audit Mode**, reports, and the security dashboard without packaging or Control Center actions. |
 
 ```bash
 # For security admins and release managers

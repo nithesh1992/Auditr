@@ -122,8 +122,8 @@
                 </div>
             </div>
 
-            <!-- Daily Schedule Controls (2-Column Grid, Same Row) -->
-            <div class="schedule-grid">
+            <!-- Daily Schedule Controls (1- or 2-Column Grid) -->
+            <div class={scheduleGridClass}>
                 <div class="schedule-box schedule-box-sync">
                     <div class="schedule-hour-picker">
                         <lightning-combobox
@@ -159,40 +159,42 @@
                     </div>
                 </div>
 
-                <div class="schedule-box schedule-box-purge">
-                    <div class="schedule-hour-picker">
-                        <lightning-combobox
-                            name="purgeScheduleHour"
-                            label="Daily Purge Hour (Org Time Zone)"
-                            value={selectedPurgeHour}
-                            options={hourOptions}
-                            onchange={handlePurgeHourChange}
-                        ></lightning-combobox>
-                    </div>
-                    <div class="schedule-actions">
-                        <lightning-button
-                            label="Schedule Daily Purge"
-                            variant="neutral"
-                            icon-name="utility:event"
-                            onclick={handleSchedulePurge}
-                            disabled={isBusy}
-                        ></lightning-button>
-                        <template lwc:if={status.isPurgeScheduled}>
+                <template lwc:if={showPurgeSchedule}>
+                    <div class="schedule-box schedule-box-purge">
+                        <div class="schedule-hour-picker">
+                            <lightning-combobox
+                                name="purgeScheduleHour"
+                                label="Daily Purge Hour (Org Time Zone)"
+                                value={selectedPurgeHour}
+                                options={hourOptions}
+                                onchange={handlePurgeHourChange}
+                            ></lightning-combobox>
+                        </div>
+                        <div class="schedule-actions">
                             <lightning-button
-                                label="Unschedule"
-                                variant="destructive-text"
-                                icon-name="utility:clear"
-                                onclick={handleUnschedulePurge}
+                                label="Schedule Daily Purge"
+                                variant="neutral"
+                                icon-name="utility:event"
+                                onclick={handleSchedulePurge}
                                 disabled={isBusy}
                             ></lightning-button>
-                        </template>
-                        <template lwc:if={status.purgeScheduleOwnerUsername}>
-                            <span class="slds-text-body_small slds-text-color_weak">
-                                Scheduled by: {status.purgeScheduleOwnerUsername}
-                            </span>
-                        </template>
+                            <template lwc:if={status.isPurgeScheduled}>
+                                <lightning-button
+                                    label="Unschedule"
+                                    variant="destructive-text"
+                                    icon-name="utility:clear"
+                                    onclick={handleUnschedulePurge}
+                                    disabled={isBusy}
+                                ></lightning-button>
+                            </template>
+                            <template lwc:if={status.purgeScheduleOwnerUsername}>
+                                <span class="slds-text-body_small slds-text-color_weak">
+                                    Scheduled by: {status.purgeScheduleOwnerUsername}
+                                </span>
+                            </template>
+                        </div>
                     </div>
-                </div>
+                </template>
             </div>
         </div>
 

@@ -2,7 +2,7 @@
     background: #ffffff;
     border: 1px solid #e5e5e5;
     border-radius: 0.5rem;
-    padding: 1.125rem 1.5rem 1.25rem;
+    padding: 1.25rem 1.5rem;
 }
 
 .card-header {
@@ -23,65 +23,92 @@
 }
 
 .title-text {
-    font-size: 1.05rem;
+    font-size: 1.1rem;
     font-weight: 700;
     color: #0f172a;
     margin: 0;
 }
 
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+.filter-panel {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
 }
 
-.section-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-bottom: 0.625rem;
-}
-
-.section-divider {
-    border-top: 1px solid #f1f5f9;
-    margin: 1.25rem 0;
+.time-mode-selector {
+    display: inline-block;
 }
 
 .filter-controls {
     display: grid;
-    grid-template-columns: 1.2fr 1.2fr 1.5fr auto auto;
+    grid-template-columns: 1fr 1fr 1.3fr auto auto auto;
     gap: 0.875rem;
     align-items: end;
-    margin-bottom: 0.875rem;
 }
 
-@media (max-width: 1100px) {
+.filter-input-user {
+    min-width: 200px;
+}
+
+.actor-hint {
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.filter-toggle {
+    display: flex;
+    align-items: center;
+    padding-bottom: 0.375rem;
+}
+
+@media (max-width: 1200px) {
     .filter-controls {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
-.package-actions {
+.results-action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.875rem;
+    padding: 0.5rem 0.25rem;
+}
+
+.results-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+    font-size: 0.875rem;
+}
+
+.stats-badge {
+    font-weight: 600;
+    font-size: 0.8125rem;
+}
+
+.stats-item {
+    color: #475569;
+}
+
+.stats-divider {
+    color: #cbd5e1;
+}
+
+.package-buttons {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 0.875rem;
 }
 
-.confirm-panel {
-    display: flex;
-    gap: 0.75rem;
-    padding: 0.875rem 1rem;
-    margin-bottom: 0.875rem;
-    background: #fef6ec;
-    border: 1px solid #f3d9ac;
-    border-radius: 0.5rem;
-}
-
-.confirm-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 0.625rem;
+.existing-log-section,
+.new-log-form {
+    padding-top: 0.25rem;
 }

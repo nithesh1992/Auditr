@@ -41,24 +41,33 @@ Each row cites **one audit entry inside one change log**, so the same event can 
 
 ## Using the Audit Mode Tab
 
-The workspace is a single LWC (`auditrAuditMode`) with two panels:
+The workspace is a single unified LWC (`auditrAuditMode`) integrating incident triage and compliance change packaging:
 
-1. **Change Logs** — recent logs with CR number, status, entry counts, and sign-off time. Single-select any **Draft** row to make it the packaging target. Click **New Change Log** to create one (CR Id required, deployment date and description optional).
-2. **Unassigned Changes Backlog** — audit entries with **no change log citation**, filtered by:
-   - **Occurred From / To** — `Occurred_At__c` window (defaults to the last 30 days).
-   - **Responsible Actor (exact)** — filter to a single responsible username.
-   - **Group Actor Bursts** — UI-layer temporal grouping that collapses consecutive changes by the same actor into expandable bursts. Raw database records are never coalesced; this is presentation-only to preserve forensic integrity.
+### 1. Dual-Mode Time Filtering
+- **Window (Date Range)** — Specify exact `Occurred From` and `Occurred To` date boundaries (defaults to the last 7 days).
+- **Incident (Time ± Radius)** — Anchor around a critical timestamp with radius presets (`± 15 Minutes`, `± 30 Minutes`, `± 1 Hour`, `± 4 Hours`, `± 12 Hours`) for immediate production root-cause analysis. Auto-anchors to the latest synced event on load.
 
-### Packaging actions
+### 2. Investigation Filters
+- **Responsible Actor (User Lookup)** — Powered by `lightning-record-picker` with bidirectional Name/Username resolution and avatar preview. Filters against the indexed `Responsible_Username__c` field.
+- **High & Critical Risk Only** — Instantly isolates high-severity changes (security alterations, permissions, code modifications).
+- **Group Actor Bursts** — Presentation-layer temporal grouping with **cascading selection**:
+  - Consecutive actions by the same actor are grouped into a burst row showing `Burst: N`.
+  - Checking the burst row checkbox automatically selects **all N underlying audit entries**.
+  - Expanding the burst allows checking/unchecking individual actions.
 
-- **Package Selected (N)** — cites the datatable-selected entries (up to the 200-row page) into the target log.
-- **Package All Matching (M)** — packages *every* unassigned entry matching the current filter. Confirmation panel shows the exact scope; the filter is stored on the change log for reproducibility.
+### 3. All Events Visibility & Packaging Status
+The table displays all events in the filtered window, showing forensic details and a **Package Status** badge:
+- **Packaged Entries**: Show the external Change Request Id (e.g. `[ CR-10492 ]`) linking directly to the parent Change Log.
+- **Unassigned Entries**: Labeled `Unassigned`, immediately ready for packaging.
 
-Both actions enqueue `AuditrChangeLogBatch` asynchronously — sized for 10,000+ entry release windows, well beyond synchronous Apex DML limits. The workspace notifies the auditor that packaging has started in the background. A change log with an in-flight job (`Packaging_Job_Id__c`) refuses new packaging until the job completes.
-
-### Home posture
-
-The **Unassigned Changes** KPI on the Auditr Home At-a-Glance strip counts entries within the selected window that no change log cites (capped at 5,000) — the headline governance metric for compliance officers.
+### 4. Scalable Modal-First Packaging Workflow
+The top change log table has been replaced with a streamlined, scalable modal:
+- **Package Selected (N)** — Packages the explicitly selected entries (or bursts).
+- **Package All Unassigned (M)** — Packages every unassigned entry matching the current filter.
+- **Package Changes Modal**:
+  - **Link to Existing Change Log** — Search open `Draft` change logs by Change Request Id or Name via auto-complete.
+  - **Create New Change Log** — On-the-fly creation requiring external `Change Request Id` (Jira, ServiceNow, etc.) with optional deployment date and description.
+- Packaging enqueues `AuditrChangeLogBatch` asynchronously in the background and delivers a toast notification with links to the Change Log.
 
 ---
 

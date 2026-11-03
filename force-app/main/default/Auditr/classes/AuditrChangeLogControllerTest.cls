@@ -166,4 +166,85 @@ private class AuditrChangeLogControllerTest {
         Assert.isNotNull(missingError, 'Packaging without a change log should raise AuraHandledException');
         Assert.isNotNull(emptySelectionError, 'Packaging without selected entries should raise AuraHandledException');
     }
+
+    @IsTest
+    private static void shouldResolveUser_WhenIdOrUsernameGiven() {
+        User currentUser = [SELECT Id, Name, Username FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
+        AuditrChangeLogController.UserLookupDTO byId;
+        AuditrChangeLogController.UserLookupDTO byUsername;
+        AuditrChangeLogController.UserLookupDTO notFound;
+
+        System.runAs(currentUser) {
+            Test.startTest();
+            byId = AuditrChangeLogController.resolveUser(currentUser.Id, null);
+            byUsername = AuditrChangeLogController.resolveUser(null, currentUser.Username);
+            notFound = AuditrChangeLogController.resolveUser(null, 'nonexistent.user.12345@example.com');
+            Test.stopTest();
+        }
+
+        Assert.isNotNull(byId, 'Should resolve user by Id');
+        Assert.areEqual(currentUser.Username, byId.username, 'Resolved username should match');
+        Assert.isNotNull(byUsername, 'Should resolve user by username');
+        Assert.areEqual(currentUser.Id, byUsername.userId, 'Resolved userId should match');
+        Assert.isNull(notFound, 'Nonexistent user should return null');
+    }
+
+    @IsTest
+    private static void shouldReturnAuditEntries_WithPackagedStateAndRiskFilters() {
+        User currentUser = [SELECT Id, Username FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
+        List<AuditrChangeLogController.AuditEntryDTO> allEntries;
+        List<AuditrChangeLogController.AuditEntryDTO> highRiskEntries;
+        List<AuditrChangeLogController.AuditEntryDTO> actorEntries;
+
+        System.runAs(currentUser) {
+            Test.startTest();
+            allEntries = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, false);
+            highRiskEntries = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, true);
+            actorEntries = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', false);
+            List<AuditrChangeLogController.AuditEntryDTO> actorHighRisk = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', true);
+            AuditrChangeLogController.UserLookupDTO blankUser = AuditrChangeLogController.resolveUser(null, '   ');
+            Assert.isFalse(actorHighRisk.isEmpty(), 'Actor with high risk filter should return records');
+            Assert.isNull(blankUser, 'Blank user lookup should return null');
+            Test.stopTest();
+        }
+
+        Assert.isFalse(allEntries.isEmpty(), 'Should return audit entries');
+        Boolean foundPackaged = false;
+        Boolean foundUnassigned = false;
+        for (AuditrChangeLogController.AuditEntryDTO row : allEntries) {
+            if (row.isPackaged) {
+                foundPackaged = true;
+                Assert.isNotNull(row.changeRequestId, 'Packaged entry must carry change request id');
+            } else {
+                foundUnassigned = true;
+            }
+        }
+        Assert.isTrue(foundPackaged, 'Should detect packaged entry');
+        Assert.isTrue(foundUnassigned, 'Should detect unassigned entry');
+        Assert.isFalse(highRiskEntries.isEmpty(), 'Should return high risk entries');
+        for (AuditrChangeLogController.AuditEntryDTO row : highRiskEntries) {
+            Assert.isTrue(row.riskLevel == 'Critical' || row.riskLevel == 'High', 'High risk filter must only include Critical or High');
+        }
+        Assert.isFalse(actorEntries.isEmpty(), 'Should filter by actor username');
+    }
+
+    @IsTest
+    private static void shouldSearchDraftChangeLogs_WhenSearchTermProvided() {
+        User currentUser = [SELECT Id, Username FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
+        List<AuditrChangeLogController.ChangeLogDTO> allDrafts;
+        List<AuditrChangeLogController.ChangeLogDTO> matchedDrafts;
+        List<AuditrChangeLogController.ChangeLogDTO> unmatchedDrafts;
+
+        System.runAs(currentUser) {
+            Test.startTest();
+            allDrafts = AuditrChangeLogController.searchDraftChangeLogs(null);
+            matchedDrafts = AuditrChangeLogController.searchDraftChangeLogs('PROJ-');
+            unmatchedDrafts = AuditrChangeLogController.searchDraftChangeLogs('NONEXISTENT-XYZ-999');
+            Test.stopTest();
+        }
+
+        Assert.isFalse(allDrafts.isEmpty(), 'Search with null should return recent draft change logs');
+        Assert.isFalse(matchedDrafts.isEmpty(), 'Search with matching prefix should return matched draft change logs');
+        Assert.isTrue(unmatchedDrafts.isEmpty(), 'Search with nonexistent term should return empty list');
+    }
 }

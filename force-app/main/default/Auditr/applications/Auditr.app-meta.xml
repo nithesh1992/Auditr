@@ -24,7 +24,6 @@
     <label>Auditr</label>
     <navType>Standard</navType>
     <tabs>Auditr_Home</tabs>
-    <tabs>Auditr_Incident_Mode</tabs>
     <tabs>Auditr_Audit_Mode</tabs>
     <tabs>Auditr_Change_Log__c</tabs>
     <tabs>Auditr_Control_Center</tabs>

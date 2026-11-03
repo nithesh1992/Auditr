@@ -1,6 +1,6 @@
-# Control Center, Incident Mode & Record Detail
+# Control Center, Audit Mode & Record Detail
 
-Auditr ships four specialized Lightning tabs — **Auditr Home**, **Incident Mode**, **Audit Mode**, and **Auditr Control Center** — so each operating mode gets its own focused surface instead of one overloaded page.
+Auditr ships focused Lightning surfaces — **Auditr Home**, **Audit Mode** (unified investigation and packaging), **Auditr Control Center**, and **Change Logs** — so operational and governance workflows are clean, fast, and scalable.
 
 ---
 
@@ -22,14 +22,13 @@ Select a lookback window (**Last 24 Hours** through **Last 1 Year**) to evaluate
 
 ---
 
-## 2. Incident Mode (`auditrIncidentMode`)
+## 2. Unified Investigation & Audit Mode (`auditrAuditMode`)
 
-The dedicated **Incident Mode** tab answers one question fast: *what changed around a timestamp?*
+Incident triage and compliance packaging are unified into a single workspace:
 
-- **Incident Timestamp**: Pick the exact date and time an outage, deployment issue, or suspicious activity occurred. The component auto-anchors to the newest synced audit event on load so a first search runs immediately.
-- **Radius Window**: Choose `±15 min`, `±30 min`, `±1 hour`, `±4 hours`, or `±12 hours` around the anchor timestamp.
-- **High Risk Only Toggle**: Filter strictly to `Critical` and `High` risk changes or view all risk levels.
-- **Direct Record Navigation**: Click any event name (`AUD-xxxxxxx`) in the timeline table to open its immutable detail view (up to 100 events, newest first).
+- **Incident Investigation**: Rapidly pinpoint changes around an outage or deployment using **Incident (Time ± Radius)** mode (`±15m` to `±12h`) and the **High & Critical Risk Only** filter.
+- **Change Packaging**: Package investigated changes or unassigned backlogs directly into **Change Logs** via the modal-first workflow.
+- See the complete guide at [Audit Mode & Change Packaging](/audit-mode).
 
 ---
 
