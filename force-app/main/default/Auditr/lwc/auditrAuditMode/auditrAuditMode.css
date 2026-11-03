@@ -33,42 +33,90 @@
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 0.5rem;
-    padding: 1rem 1.25rem;
-    margin-bottom: 1rem;
+    padding: 1.25rem;
+    margin-bottom: 1.25rem;
 }
 
 .time-mode-selector {
     display: inline-block;
 }
 
-.filter-controls {
+/* Row 1: Symmetrically Aligned 3-Column Inputs Grid */
+.filter-inputs-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1.3fr auto auto auto;
-    gap: 0.875rem;
-    align-items: end;
+    grid-template-columns: 1fr 1fr 1.25fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+.filter-input {
+    min-width: 0;
 }
 
 .filter-input-user {
-    min-width: 200px;
+    min-width: 0;
+}
+
+.actor-hint-container {
+    display: flex;
+    align-items: center;
 }
 
 .actor-hint {
-    margin-top: 0.25rem;
     font-size: 0.75rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    color: #475569;
+    background: #edf2f7;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.5rem;
+}
+
+/* Row 2: Aligned Options, Toggles & Action Toolbar */
+.filter-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.filter-toggles-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 2rem;
 }
 
 .filter-toggle {
     display: flex;
     align-items: center;
-    padding-bottom: 0.375rem;
 }
 
-@media (max-width: 1200px) {
-    .filter-controls {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+.filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+@media (max-width: 1024px) {
+    .filter-inputs-grid {
+        grid-template-columns: 1fr;
+        gap: 0.875rem;
+    }
+    .filter-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+    .filter-toggles-group {
+        justify-content: space-between;
+        gap: 1rem;
+    }
+    .filter-actions {
+        justify-content: flex-end;
     }
 }
 

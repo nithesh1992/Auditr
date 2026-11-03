@@ -28,7 +28,7 @@
 
         <!-- Unified Investigation Filter Bar -->
         <div class="filter-panel">
-            <div class="time-mode-selector slds-m-bottom_small">
+            <div class="time-mode-selector slds-m-bottom_medium">
                 <lightning-radio-group
                     name="timeMode"
                     label="Investigation Time Mode"
@@ -39,7 +39,8 @@
                 ></lightning-radio-group>
             </div>
 
-            <div class="filter-controls">
+            <!-- Row 1: Symmetrically Aligned 3-Column Inputs Grid -->
+            <div class="filter-inputs-grid">
                 <template lwc:if={isWindowMode}>
                     <div class="filter-input">
                         <lightning-input
@@ -87,7 +88,7 @@
 
                 <div class="filter-input filter-input-user">
                     <lightning-record-picker
-                        label="Responsible Actor"
+                        label={actorPickerLabel}
                         placeholder="Search users by name or username..."
                         object-api-name="User"
                         value={selectedUserId}
@@ -96,38 +97,45 @@
                         onchange={handleUserChange}
                     ></lightning-record-picker>
                     <template lwc:if={actorInput}>
-                        <p class="actor-hint slds-text-body_small slds-text-color_weak">
-                            Actor: {actorInput}
-                        </p>
+                        <div class="actor-hint-container slds-m-top_xx-small">
+                            <span class="actor-hint slds-badge slds-badge_lightest">
+                                Filtered by: {actorInput}
+                            </span>
+                        </div>
                     </template>
                 </div>
+            </div>
 
-                <div class="filter-action filter-toggle">
-                    <lightning-input
-                        type="toggle"
-                        label="High &amp; Critical Risk Only"
-                        name="highRiskOnly"
-                        checked={highRiskOnly}
-                        message-toggle-active="High/Critical"
-                        message-toggle-inactive="All Risks"
-                        onchange={handleHighRiskToggle}
-                    ></lightning-input>
+            <!-- Row 2: Aligned Options, Toggles & Action Toolbar -->
+            <div class="filter-toolbar">
+                <div class="filter-toggles-group">
+                    <div class="filter-toggle">
+                        <lightning-input
+                            type="toggle"
+                            label="High &amp; Critical Risk Only"
+                            name="highRiskOnly"
+                            checked={highRiskOnly}
+                            message-toggle-active="High/Critical"
+                            message-toggle-inactive="All Risks"
+                            onchange={handleHighRiskToggle}
+                        ></lightning-input>
+                    </div>
+
+                    <div class="filter-toggle">
+                        <lightning-input
+                            class="burst-toggle-input"
+                            type="toggle"
+                            label="Group Actor Bursts"
+                            name="groupBursts"
+                            checked={groupBursts}
+                            message-toggle-active="Grouped"
+                            message-toggle-inactive="Flat"
+                            onchange={handleBurstToggle}
+                        ></lightning-input>
+                    </div>
                 </div>
 
-                <div class="filter-action filter-toggle">
-                    <lightning-input
-                        class="burst-toggle-input"
-                        type="toggle"
-                        label="Group Actor Bursts"
-                        name="groupBursts"
-                        checked={groupBursts}
-                        message-toggle-active="Grouped"
-                        message-toggle-inactive="Flat"
-                        onchange={handleBurstToggle}
-                    ></lightning-input>
-                </div>
-
-                <div class="filter-action">
+                <div class="filter-actions">
                     <lightning-button
                         label="Apply Filters"
                         variant="brand"

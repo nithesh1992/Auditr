@@ -177,6 +177,10 @@ export default class AuditrAuditMode extends LightningElement {
         return this.timeMode === 'incident';
     }
 
+    get actorPickerLabel() {
+        return this.actorInput ? `Responsible Actor (${this.actorInput})` : 'Responsible Actor';
+    }
+
     get hasEntryRows() {
         return Array.isArray(this.entryRows) && this.entryRows.length > 0;
     }
