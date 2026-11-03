@@ -69,9 +69,9 @@ Install the Unlocked Package or deploy from source, assign `Auditr_Admin`, and s
 
 ::: code-group
 
-```bash [Install Package v1.1.0-1]
+```bash [Install Package v1.1.1-1]
 # Install the Unlocked Package
-sf package install --package 04tg7000000coevAAA --target-org <alias> --wait 10
+sf package install --package 04tg7000000coobAAA --target-org <alias> --wait 10
 
 # Assign Admin permissions
 sf org assign permset --name Auditr_Admin --target-org <alias>
