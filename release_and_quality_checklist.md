@@ -33,31 +33,31 @@ This persistent checklist documents the end-to-end standard operating procedure 
 Execute these steps in sequence every time changes are made.
 
 ### Phase A: Pre-Release Quality Gates
-- [ ] **1. Run LWC Jest Unit Tests**:
+- [x] **1. Run LWC Jest Unit Tests**:
   ```bash
   cd /Users/nitheshnekkanti/Repos/SF-Auditr && npm run test:unit
   ```
   *Requirement: All 5 test suites pass (6/6 tests).*
 
-- [ ] **2. Deploy Metadata to Target Org**:
+- [x] **2. Deploy Metadata to Target Org**:
   ```bash
   cd /Users/nitheshnekkanti/Repos/SF-Auditr && sf project deploy start --target-org techninja
   ```
   *Requirement: 100% clean deployment of all components with 0 errors or warnings.*
 
-- [ ] **3. Run Apex Unit Tests & Code Coverage**:
+- [x] **3. Run Apex Unit Tests & Code Coverage**:
   ```bash
   cd /Users/nitheshnekkanti/Repos/SF-Auditr && sf apex run test --target-org techninja --test-level RunLocalTests --code-coverage --result-format human --wait 10
   ```
   *Requirement: 39/39 tests passing (100%), org-wide coverage >= 85% (Auditr target: 90%+).*
 
-- [ ] **4. Build Documentation Locally**:
+- [x] **4. Build Documentation Locally**:
   ```bash
   cd /Users/nitheshnekkanti/Repos/SF-Auditr && npm run docs:build
   ```
   *Requirement: Clean VitePress build with 0 broken links or markdown syntax errors.*
 
-- [ ] **5. Verify Git Working Tree**:
+- [x] **5. Verify Git Working Tree**:
   ```bash
   cd /Users/nitheshnekkanti/Repos/SF-Auditr && git status
   ```
@@ -66,11 +66,11 @@ Execute these steps in sequence every time changes are made.
 ---
 
 ### Phase B: Package Version Creation & Promotion
-- [ ] **6. Version Config Bumps (if releasing new minor/major)**:
+- [x] **6. Version Config Bumps (if releasing new minor/major)**:
   - In `sfdx-project.json`: verify `versionName` (e.g. `v1.0`) and `versionNumber` (`X.Y.0.NEXT`).
   - In `package.json`: verify `"version": "X.Y.0"`.
 
-- [ ] **7. Create Unlocked Package Version**:
+- [x] **7. Create Unlocked Package Version**:
   ```bash
   cd /Users/nitheshnekkanti/Repos/SF-Auditr && sf package version create \
     --package Auditr \
@@ -83,7 +83,7 @@ Execute these steps in sequence every time changes are made.
   ```
   *Captures newly generated `Auditr@X.Y.0-N: 04t...` alias automatically added to `sfdx-project.json`.*
 
-- [ ] **8. Promote Package Version**:
+- [x] **8. Promote Package Version**:
   ```bash
   cd /Users/nitheshnekkanti/Repos/SF-Auditr && sf package version promote \
     --package Auditr@X.Y.0-N \
@@ -95,20 +95,20 @@ Execute these steps in sequence every time changes are made.
 ---
 
 ### Phase C: Documentation Website Update & Verification
-- [ ] **9. Update Package Version ID (`04t...`) Across Documentation**:
+- [x] **9. Update Package Version ID (`04t...`) Across Documentation**:
   Replace previous `04t...` ID with the newly generated `04t...` ID across:
   - `README.md` (unlocked package code block, install URLs)
   - `docs/getting-started.md` (install code block, browser URLs)
   - `docs/index.md` (code-group tab label, install command)
   - `docs/.vitepress/config.mjs` (nav items)
 
-- [ ] **10. Re-verify VitePress Documentation Build**:
+- [x] **10. Re-verify VitePress Documentation Build**:
   ```bash
   cd /Users/nitheshnekkanti/Repos/SF-Auditr && npm run docs:build
   ```
   *Confirms markdown syntax, links, and code blocks compile cleanly.*
 
-- [ ] **11. Commit, Tag, and Push to GitHub**:
+- [x] **11. Commit, Tag, and Push to GitHub**:
   ```bash
   cd /Users/nitheshnekkanti/Repos/SF-Auditr && git add .
   git commit -m "Release Auditr vX.Y.0-N (<04t_ID>) <brief description>"
@@ -118,7 +118,7 @@ Execute these steps in sequence every time changes are made.
   ```
   *Pushing to `main` automatically triggers the GitHub Actions `docs.yml` workflow to publish the updated documentation website.*
 
-- [ ] **12. Publish GitHub Release**:
+- [x] **12. Publish GitHub Release**:
   ```bash
   TOKEN=$(printf "protocol=https\nhost=github.com\n\n" | git credential fill | grep "^password=" | cut -d= -f2)
 
@@ -136,6 +136,6 @@ Execute these steps in sequence every time changes are made.
     }'
   ```
 
-- [ ] **13. Verify Live Documentation Website Deployment**:
+- [x] **13. Verify Live Documentation Website Deployment**:
   - Verify GitHub Actions workflow run: `Deploy Documentation to GitHub Pages` completes with `success`.
   - Inspect live site: <https://nithesh1992.github.io/Auditr/> to confirm install links and badges reflect the new version.
