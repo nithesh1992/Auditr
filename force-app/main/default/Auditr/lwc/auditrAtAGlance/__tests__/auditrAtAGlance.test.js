@@ -1,7 +1,6 @@
 import { createElement } from 'lwc';
 import AuditrAtAGlance from 'c/auditrAtAGlance';
 import getAtAGlanceMetrics from '@salesforce/apex/AuditrController.getAtAGlanceMetrics';
-import getIncidentTimeline from '@salesforce/apex/AuditrController.getIncidentTimeline';
 
 jest.mock(
     '@salesforce/apex/AuditrController.getAtAGlanceMetrics',
@@ -9,12 +8,6 @@ jest.mock(
         const { createApexTestWireAdapter } = require('@salesforce/sfdx-lwc-jest');
         return { default: createApexTestWireAdapter(jest.fn()) };
     },
-    { virtual: true }
-);
-
-jest.mock(
-    '@salesforce/apex/AuditrController.getIncidentTimeline',
-    () => ({ default: jest.fn() }),
     { virtual: true }
 );
 
@@ -28,22 +21,7 @@ describe('c-auditr-at-a-glance', () => {
         jest.clearAllMocks();
     });
 
-    it('renders KPI counts from wired metrics and toggles Incident Mode', async () => {
-        getIncidentTimeline.mockResolvedValue([
-            {
-                recordId: 'a01000000000001AAA',
-                name: 'AUD-0000001',
-                occurredAt: '2026-10-31T15:00:00.000Z',
-                riskLevel: 'High',
-                category: 'Security & Access',
-                section: 'Manage Users',
-                actionCode: 'changedprofile',
-                responsibleUsername: 'admin@example.com',
-                delegateUser: null,
-                displayText: 'Changed profile System Administrator.'
-            }
-        ]);
-
+    it('renders all 7 KPI cards including unassigned changes from wired metrics', async () => {
         const element = createElement('c-auditr-at-a-glance', { is: AuditrAtAGlance });
         document.body.appendChild(element);
 
@@ -54,23 +32,16 @@ describe('c-auditr-at-a-glance', () => {
             automationAndMetadataCount: 12,
             impersonatedCount: 3,
             unclassifiedCount: 2,
+            unassignedChangeCount: 31,
             lastSyncedOccurredAt: '2026-10-31T15:00:00.000Z'
         });
 
         await flushPromises();
 
         const kpiValues = element.shadowRoot.querySelectorAll('.kpi-value');
-        expect(kpiValues.length).toBe(6);
+        expect(kpiValues.length).toBe(7);
         expect(kpiValues[0].textContent.trim()).toBe('42');
         expect(kpiValues[1].textContent.trim()).toBe('7');
-
-        const incidentBtn = element.shadowRoot.querySelector('lightning-button');
-        incidentBtn.click();
-        await flushPromises();
-
-        expect(getIncidentTimeline).toHaveBeenCalledTimes(1);
-        const datatable = element.shadowRoot.querySelector('lightning-datatable');
-        expect(datatable).not.toBeNull();
-        expect(datatable.data.length).toBe(1);
+        expect(kpiValues[6].textContent.trim()).toBe('31');
     });
 });

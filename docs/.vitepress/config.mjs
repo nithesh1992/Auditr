@@ -23,8 +23,9 @@ export default defineConfig({
         text: "Guide",
         link: "/getting-started",
         activeMatch:
-          "/getting-started|/control-center-and-incident-mode|/classification-and-retention|/architecture"
+          "/getting-started|/control-center-and-incident-mode|/audit-mode|/classification-and-retention|/architecture"
       },
+      { text: "Audit Mode & Change Packaging", link: "/audit-mode" },
       { text: "Control Center & Incident Mode", link: "/control-center-and-incident-mode" },
       { text: "Rules & Retention", link: "/classification-and-retention" },
       { text: "Architecture", link: "/architecture" },
@@ -32,8 +33,8 @@ export default defineConfig({
         text: "v1.0.0",
         items: [
           {
-            text: "Install v1.0.0-5 (04tg7000000cCPxAAM)",
-            link: "https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cCPxAAM"
+            text: "Install v1.0.0-2 (04tg7000000cltxAAA)",
+            link: "https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cltxAAA"
           },
           {
             text: "Source Code",
@@ -54,6 +55,10 @@ export default defineConfig({
       {
         text: "Security & Operations",
         items: [
+          {
+            text: "Audit Mode & Change Packaging",
+            link: "/audit-mode"
+          },
           {
             text: "Control Center & Incident Mode",
             link: "/control-center-and-incident-mode"

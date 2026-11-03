@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <deploymentStatus>Deployed</deploymentStatus>
+    <description>The Auditr Change Log Item object cites one Auditr Entry inside one Auditr Change Log, enabling the same audit event to appear in multiple independent compliance scopes. A unique compound key blocks duplicate citations within the same log. Commonly used for multi-audit citation and change packaging.</description>
+    <enableBulkApi>true</enableBulkApi>
+    <enableStreamingApi>true</enableStreamingApi>
+    <label>Auditr Change Log Item</label>
+    <nameField>
+        <displayFormat>CLI-{0000000}</displayFormat>
+        <label>Change Log Item Number</label>
+        <type>AutoNumber</type>
+    </nameField>
+    <pluralLabel>Auditr Change Log Items</pluralLabel>
+    <sharingModel>ControlledByParent</sharingModel>
+    <visibility>Public</visibility>
+</CustomObject>

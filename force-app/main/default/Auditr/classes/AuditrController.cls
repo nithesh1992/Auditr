@@ -20,6 +20,7 @@ public with sharing class AuditrController {
         @AuraEnabled public Integer automationAndMetadataCount;
         @AuraEnabled public Integer impersonatedCount;
         @AuraEnabled public Integer unclassifiedCount;
+        @AuraEnabled public Integer unassignedChangeCount;
         @AuraEnabled public DateTime lastSyncedOccurredAt;
     }
 
@@ -39,7 +40,7 @@ public with sharing class AuditrController {
     }
 
     /** @description Full operational state for the Auditr Control Center tab. */
-    @SuppressWarnings('PMD.TooManyFields')
+    @SuppressWarnings('PMD.TooManyFields,PMD.ExcessivePublicCount')
     public class ControlCenterStatusDTO {
         @AuraEnabled public Boolean isActive;
         @AuraEnabled public Integer backfillDays;
@@ -118,8 +119,22 @@ public with sharing class AuditrController {
         metrics.automationAndMetadataCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Category__c IN ('Code & Automation', 'Data & Schema') WITH USER_MODE LIMIT :KPI_COUNT_CAP];
         metrics.impersonatedCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Delegate_User__c != NULL WITH USER_MODE LIMIT :KPI_COUNT_CAP];
         metrics.unclassifiedCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :sinceDate AND Category__c = :defaultCategory WITH USER_MODE LIMIT :KPI_COUNT_CAP];
+        metrics.unassignedChangeCount = [
+            SELECT COUNT() FROM Auditr_Entry__c
+            WHERE Occurred_At__c >= :sinceDate AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
+            WITH USER_MODE LIMIT :KPI_COUNT_CAP
+        ];
         metrics.lastSyncedOccurredAt = queryLatestOccurredAt();
         return metrics;
+    }
+
+    /**
+     * @description Returns the newest synced Occurred_At__c watermark for lightweight LWC consumers (Incident Mode).
+     * @return Latest Auditr_Entry__c Occurred_At__c value, or null when nothing is synced.
+     */
+    @AuraEnabled(cacheable=true)
+    public static DateTime getLatestSyncedOccurredAt() {
+        return queryLatestOccurredAt();
     }
 
     /**
@@ -203,6 +218,7 @@ public with sharing class AuditrController {
      */
     @AuraEnabled
     public static Id runSyncNow() {
+        requireAdminAccess();
         return Database.executeBatch(new AuditrSyncBatch(), AuditrUtil.getBatchSize());
     }
 
@@ -214,6 +230,7 @@ public with sharing class AuditrController {
     @AuraEnabled
     @SuppressWarnings('PMD.AvoidBooleanMethodParameters')
     public static Id runReclassify(Boolean onlyUnclassified) {
+        requireAdminAccess();
         return Database.executeBatch(new AuditrReclassifyBatch(onlyUnclassified != false), AuditrUtil.getBatchSize());
     }
 
@@ -223,6 +240,7 @@ public with sharing class AuditrController {
      */
     @AuraEnabled
     public static Id runPurgeNow() {
+        requireAdminAccess();
         return Database.executeBatch(new AuditrPurgeBatch(), AuditrUtil.getBatchSize());
     }
 
@@ -233,6 +251,7 @@ public with sharing class AuditrController {
      */
     @AuraEnabled
     public static Id scheduleDailySync(Integer hourOfDay) {
+        requireAdminAccess();
         unscheduleDailySync();
         Integer targetHour = (hourOfDay != null && hourOfDay >= 0 && hourOfDay <= 23) ? hourOfDay : Integer.valueOf(AuditrUtil.getSetting().Preferred_Sync_Hour__c ?? AuditrUtil.DEFAULT_SYNC_HOUR);
         return System.schedule(SCHEDULED_JOB_NAME, '0 0 ' + targetHour + ' * * ?', new AuditrSyncBatch());
@@ -243,6 +262,7 @@ public with sharing class AuditrController {
      */
     @AuraEnabled
     public static void unscheduleDailySync() {
+        requireAdminAccess();
         abortScheduledJobsByPrefix(SCHEDULED_JOB_NAME);
     }
 
@@ -253,6 +273,7 @@ public with sharing class AuditrController {
      */
     @AuraEnabled
     public static Id scheduleDailyPurge(Integer hourOfDay) {
+        requireAdminAccess();
         unscheduleDailyPurge();
         Integer targetHour = (hourOfDay != null && hourOfDay >= 0 && hourOfDay <= 23) ? hourOfDay : DEFAULT_PURGE_HOUR;
         return System.schedule(SCHEDULED_PURGE_JOB_NAME, '0 0 ' + targetHour + ' * * ?', new AuditrPurgeBatch());
@@ -263,7 +284,16 @@ public with sharing class AuditrController {
      */
     @AuraEnabled
     public static void unscheduleDailyPurge() {
+        requireAdminAccess();
         abortScheduledJobsByPrefix(SCHEDULED_PURGE_JOB_NAME);
+    }
+
+    private static void requireAdminAccess() {
+        if (!Schema.sObjectType.Auditr_Entry__c.isUpdateable()) {
+            AuraHandledException ex = new AuraHandledException('Auditr Admin access is required for Control Center operations.');
+            ex.setMessage('Auditr Admin access is required for Control Center operations.');
+            throw ex;
+        }
     }
 
     private static void abortScheduledJobsByPrefix(String jobNamePrefix) {
@@ -344,7 +374,7 @@ public with sharing class AuditrController {
     private static List<JobSummaryDTO> queryRecentJobs(ControlCenterStatusDTO status) {
         Map<Id, ApexClass> auditrClasses = new Map<Id, ApexClass>([
             SELECT Id, Name FROM ApexClass
-            WHERE Name IN ('AuditrSyncBatch', 'AuditrReclassifyBatch', 'AuditrPurgeBatch')
+            WHERE Name IN ('AuditrSyncBatch', 'AuditrReclassifyBatch', 'AuditrPurgeBatch', 'AuditrChangeLogBatch')
             WITH SYSTEM_MODE
         ]);
         List<JobSummaryDTO> summaries = new List<JobSummaryDTO>();

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RecordType xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Data_Change</fullName>
+    <active>true</active>
+    <description>Reserved for Phase 2 sensitive business-object data modifications. Schema compatibility only; no pipeline ships in this release.</description>
+    <label>Data Change</label>
+    <picklistValues>
+        <picklist>Category__c</picklist>
+        <values>
+            <fullName>Security &amp; Access</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Users &amp; Sessions</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Code &amp; Automation</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Data &amp; Schema</fullName>
+            <default>true</default>
+        </values>
+        <values>
+            <fullName>Packages &amp; Integrations</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Org Preferences</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Unclassified</fullName>
+            <default>false</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Risk_Level__c</picklist>
+        <values>
+            <fullName>Critical</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>High</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Medium</fullName>
+            <default>false</default>
+        </values>
+        <values>
+            <fullName>Low</fullName>
+            <default>true</default>
+        </values>
+    </picklistValues>
+    <picklistValues>
+        <picklist>Source__c</picklist>
+        <values>
+            <fullName>DataChange</fullName>
+            <default>true</default>
+        </values>
+    </picklistValues>
+</RecordType>

@@ -1,0 +1,53 @@
+.incident-card {
+    background: #ffffff;
+    border: 1px solid #e5e5e5;
+    border-radius: 0.5rem;
+    padding: 1.125rem 1.5rem 1.25rem;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding-bottom: 0.875rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.625rem;
+}
+
+.title-text {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0;
+}
+
+.incident-controls {
+    display: grid;
+    grid-template-columns: 2fr 1.5fr 1.5fr auto;
+    gap: 0.875rem;
+    align-items: end;
+    margin-bottom: 0.875rem;
+}
+
+@media (max-width: 960px) {
+    .incident-controls {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+.watermark-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding-top: 1rem;
+}

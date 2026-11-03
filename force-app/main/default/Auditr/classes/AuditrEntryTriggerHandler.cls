@@ -8,8 +8,10 @@ public with sharing class AuditrEntryTriggerHandler {
     private static Boolean allowPurgeDelete = false;
 
     private static final List<Schema.SObjectField> IMMUTABLE_FIELDS = new List<Schema.SObjectField>{
+        Auditr_Entry__c.RecordTypeId,
         Auditr_Entry__c.Source__c,
         Auditr_Entry__c.Source_Record_Id__c,
+        Auditr_Entry__c.Payload__c,
         Auditr_Entry__c.Occurred_At__c,
         Auditr_Entry__c.Actor__c,
         Auditr_Entry__c.Actor_Username__c,

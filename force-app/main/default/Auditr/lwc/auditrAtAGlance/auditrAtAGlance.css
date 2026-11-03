@@ -41,12 +41,18 @@
 
 .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 1rem;
     margin: 0.25rem 0 1rem;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
+    .kpi-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 960px) {
     .kpi-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
@@ -93,6 +99,10 @@
     color: #dc2626;
 }
 
+.kpi-value-warning {
+    color: #b45309;
+}
+
 .watermark-footer {
     display: flex;
     align-items: center;
@@ -100,26 +110,4 @@
     flex-wrap: wrap;
     gap: 0.5rem;
     padding-top: 0.125rem;
-}
-
-.incident-panel {
-    margin-top: 1rem;
-    padding: 1rem 1.25rem;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 0.5rem;
-}
-
-.incident-controls {
-    display: grid;
-    grid-template-columns: 2fr 1.5fr 1.5fr auto;
-    gap: 0.875rem;
-    align-items: end;
-    margin-bottom: 0.875rem;
-}
-
-@media (max-width: 960px) {
-    .incident-controls {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
 }

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Change_Request_Id_Format</fullName>
+    <active>true</active>
+    <description>Enforces a ticket-safe Change Request Id format (3-40 characters: letters, digits, dots, underscores, hyphens) for ITSM traceability.</description>
+    <errorConditionFormula>NOT(REGEX(Change_Request_Id__c, "^[A-Za-z0-9][A-Za-z0-9._-]{2,39}$"))</errorConditionFormula>
+    <errorDisplayField>Change_Request_Id__c</errorDisplayField>
+    <errorMessage>Change Request Id must be 3-40 characters using letters, numbers, dots, underscores, or hyphens (e.g. PROJ-1234 or CHG0011223).</errorMessage>
+</ValidationRule>

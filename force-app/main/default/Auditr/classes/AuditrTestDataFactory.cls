@@ -54,6 +54,38 @@ public with sharing class AuditrTestDataFactory {
     }
 
     /**
+     * @description Builds and inserts a Draft Auditr_Change_Log__c with a deterministic Change Request Id.
+     * @return Inserted Auditr_Change_Log__c record.
+     */
+    public static Auditr_Change_Log__c insertChangeLog() {
+        Auditr_Change_Log__c changeLog = new Auditr_Change_Log__c(
+            Change_Request_Id__c = 'PROJ-0001',
+            Status__c = 'Draft',
+            Deployment_Date__c = System.now().addDays(2),
+            Description__c = 'Factory change log'
+        );
+        Database.insert(changeLog, AccessLevel.SYSTEM_MODE);
+        return changeLog;
+    }
+
+    /**
+     * @description Builds and inserts Auditr_Change_Log_Item__c citations for the given entries.
+     * @param changeLogId Parent Auditr_Change_Log__c Id.
+     * @param entries Auditr_Entry__c records to cite.
+     * @return Inserted Auditr_Change_Log_Item__c records.
+     */
+    public static List<Auditr_Change_Log_Item__c> insertChangeLogItems(Id changeLogId, List<Auditr_Entry__c> entries) {
+        List<Auditr_Change_Log_Item__c> items = new List<Auditr_Change_Log_Item__c>();
+        for (Auditr_Entry__c entry : entries) {
+            items.add(new Auditr_Change_Log_Item__c(Change_Log__c = changeLogId, Entry__c = entry.Id));
+        }
+        if (!items.isEmpty()) {
+            Database.insert(items, AccessLevel.SYSTEM_MODE);
+        }
+        return items;
+    }
+
+    /**
      * @description Assigns the Auditr_Admin permission set to the running user for USER_MODE test queries.
      */
     public static void assignAdminPermissionSet() {

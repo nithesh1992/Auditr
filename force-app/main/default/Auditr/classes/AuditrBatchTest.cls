@@ -99,4 +99,33 @@ private class AuditrBatchTest {
         Integer remainingCount = [SELECT COUNT() FROM Auditr_Entry__c WHERE Id = :expiredEntry.Id WITH SYSTEM_MODE];
         Assert.areEqual(0, remainingCount, 'Expired Auditr_Entry__c older than 365 days should be purged when Enable_Purge__c is true');
     }
+
+    @IsTest
+    private static void shouldExemptPackagedEntries_WhenAuditrPurgeBatchExecutes() {
+        Auditr_Entry__c expiredUnassigned = AuditrTestDataFactory.buildEntry(700, null);
+        expiredUnassigned.Occurred_At__c = System.now().addDays(-400);
+        Auditr_Entry__c expiredPackaged = AuditrTestDataFactory.buildEntry(701, null);
+        expiredPackaged.Occurred_At__c = System.now().addDays(-400);
+        Database.insert(new List<Auditr_Entry__c>{ expiredUnassigned, expiredPackaged }, AccessLevel.SYSTEM_MODE);
+        Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
+        AuditrTestDataFactory.insertChangeLogItems(changeLog.Id, new List<Auditr_Entry__c>{ expiredPackaged });
+
+        AuditrUtil.testSettingOverride = new Auditr_Setting__mdt(
+            DeveloperName = 'PurgeEnabled',
+            Is_Active__c = true,
+            Enable_Purge__c = true,
+            Retention_Days__c = 365,
+            Batch_Size__c = 200
+        );
+
+        Test.startTest();
+        new AuditrPurgeBatch().execute((SchedulableContext) null);
+        Test.stopTest();
+        AuditrUtil.testSettingOverride = null;
+
+        Integer remainingUnassigned = [SELECT COUNT() FROM Auditr_Entry__c WHERE Id = :expiredUnassigned.Id WITH SYSTEM_MODE];
+        Integer remainingPackaged = [SELECT COUNT() FROM Auditr_Entry__c WHERE Id = :expiredPackaged.Id WITH SYSTEM_MODE];
+        Assert.areEqual(0, remainingUnassigned, 'Expired unassigned entry should be purged');
+        Assert.areEqual(1, remainingPackaged, 'Entries cited by a change log must be exempt from retention purge');
+    }
 }

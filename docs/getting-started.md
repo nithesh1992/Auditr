@@ -7,7 +7,7 @@ You can install Auditr either as a versioned **Unlocked Package** or by deployin
 ::: code-group
 
 ```bash [Unlocked Package (Recommended)]
-sf package install --package 04tg7000000cCPxAAM --wait 10 --target-org <org-alias>
+sf package install --package 04tg7000000cltxAAA --wait 10 --target-org <org-alias>
 ```
 
 ```bash [Deploy from Source]
@@ -20,8 +20,8 @@ sf project deploy start --source-dir force-app/main/default/Auditr --target-org 
 
 Or install directly in the browser:
 
-- **Production / Developer Edition**: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cCPxAAM`
-- **Sandbox / Scratch Org**: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cCPxAAM`
+- **Production / Developer Edition**: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cltxAAA`
+- **Sandbox / Scratch Org**: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000cltxAAA`
 
 ## 2. Assign Permission Sets
 
@@ -29,8 +29,8 @@ Auditr ships with two permission sets following the principle of least privilege
 
 | Permission Set | API Name | Intended Audience |
 | :--- | :--- | :--- |
-| **Auditr Admin** | `Auditr_Admin` | Security administrators and release managers. Grants access to the **Auditr** Lightning App, **Auditr Home**, **Auditr Control Center**, batch execution, scheduling, and rule reclassification. |
-| **Auditr Viewer** | `Auditr_Viewer` | Compliance auditors and read-only reviewers. Grants read-only access to `Auditr_Entry__c`, **Auditr Home** (At-a-Glance + Incident Mode), reports, and the security dashboard without Control Center admin actions. |
+| **Auditr Admin** | `Auditr_Admin` | Security administrators and release managers. Grants access to the **Auditr** Lightning App, **Auditr Home**, **Incident Mode**, **Audit Mode** (change packaging), **Auditr Control Center**, batch execution, scheduling, and rule reclassification. |
+| **Auditr Viewer** | `Auditr_Viewer` | Compliance auditors and read-only reviewers. Grants read-only access to `Auditr_Entry__c`, `Auditr_Change_Log__c`, **Auditr Home**, **Incident Mode**, **Audit Mode**, reports, and the security dashboard without packaging or Control Center actions. |
 
 ```bash
 # For security admins and release managers
@@ -55,6 +55,7 @@ You can click **Sync Now** as often as you want. `AuditrSyncBatch` queries `Setu
 
 After `AuditrSyncBatch` finishes:
 
-- Open **Auditr Home** to inspect the 6 rolling KPI cards (**Total Events**, **Critical & High**, **Security & Access**, **Automation & Code**, **Impersonated**, **Unclassified**) and the embedded **Auditr Security Dashboard**.
-- Click **Incident Mode** on **Auditr Home** to investigate changes around a specific timestamp.
+- Open **Auditr Home** to inspect the 7 rolling KPI cards (**Total Events**, **Critical & High**, **Security & Access**, **Automation & Code**, **Impersonated**, **Unclassified**, **Unassigned Changes**) and the embedded **Auditr Security Dashboard**.
+- Open the **Incident Mode** tab to investigate changes around a specific timestamp (`±15m` to `±12h`).
+- Open the **Audit Mode** tab to review the unassigned changes backlog and package audit entries into sealed change logs tied to Change Requests — see [Audit Mode & Change Packaging](/audit-mode).
 - Open the **Auditr Entries** tab to browse list views (`Critical & High Risk`, `Impersonated Changes`, `Security & Access`, `Code & Automation`, `Unclassified Entries`).

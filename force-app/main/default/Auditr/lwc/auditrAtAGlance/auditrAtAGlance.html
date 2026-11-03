@@ -16,10 +16,10 @@
                     class="window-combobox"
                 ></lightning-combobox>
                 <lightning-button
-                    label={incidentButtonLabel}
-                    icon-name="utility:clock"
-                    variant={incidentButtonVariant}
-                    onclick={handleToggleIncidentMode}
+                    label="Audit Mode"
+                    icon-name="utility:task"
+                    variant="neutral"
+                    onclick={handleOpenAuditMode}
                 ></lightning-button>
                 <lightning-button-icon
                     icon-name="utility:refresh"
@@ -41,7 +41,7 @@
             </div>
         </template>
 
-        <!-- 6-KPI Strip -->
+        <!-- KPI Strip -->
         <div class="kpi-grid">
             <div class="kpi-card">
                 <p class="kpi-label" title="Total Audit Events (Capped at 25,000)">Total Events</p>
@@ -84,6 +84,13 @@
                     {formattedUnclassifiedCount}
                 </p>
             </div>
+
+            <div class="kpi-card">
+                <p class="kpi-label" title="Audit entries with no Change Log citation — compliance exceptions (Capped at 5,000)">Unassigned Changes</p>
+                <p class="kpi-value kpi-value-warning" title={metrics.unassignedChangeCount}>
+                    {formattedUnassignedChangeCount}
+                </p>
+            </div>
         </div>
 
         <!-- Watermark Footer -->
@@ -108,78 +115,5 @@
                 Window: {selectedWindowLabel} &bull; Capped at 25k total / 5k per KPI
             </span>
         </div>
-
-        <!-- Incident Mode Panel (inspired by WhatChanged) -->
-        <template lwc:if={isIncidentModeOpen}>
-            <div class="incident-panel">
-                <div class="slds-m-bottom_small">
-                    <h3 class="slds-text-heading_small">Incident Mode — What Changed Around a Timestamp?</h3>
-                    <p class="slds-text-body_small slds-text-color_weak">
-                        Pinpoint every Setup configuration change within a tight window around a production issue or deployment (up to 100 events).
-                    </p>
-                </div>
-
-                <div class="incident-controls">
-                    <div class="incident-control-time">
-                        <lightning-input
-                            type="datetime"
-                            name="incidentTimestamp"
-                            label="Incident Timestamp"
-                            value={incidentTimestamp}
-                            onchange={handleIncidentTimeChange}
-                        ></lightning-input>
-                    </div>
-                    <div class="incident-control-radius">
-                        <lightning-combobox
-                            name="incidentRadius"
-                            label="Window Radius"
-                            value={incidentRadius}
-                            options={radiusOptions}
-                            onchange={handleRadiusChange}
-                        ></lightning-combobox>
-                    </div>
-                    <div class="incident-control-toggle">
-                        <lightning-input
-                            type="toggle"
-                            label="Critical &amp; High Risk Only"
-                            name="highRiskOnly"
-                            checked={highRiskOnly}
-                            message-toggle-active="High/Critical Only"
-                            message-toggle-inactive="All Risk Levels"
-                            onchange={handleHighRiskToggle}
-                        ></lightning-input>
-                    </div>
-                    <div class="incident-control-action">
-                        <lightning-button
-                            label="Investigate"
-                            variant="brand"
-                            icon-name="utility:search"
-                            onclick={handleRunIncidentSearch}
-                            disabled={isLoadingIncident}
-                        ></lightning-button>
-                    </div>
-                </div>
-
-                <template lwc:if={isLoadingIncident}>
-                    <div class="slds-p-vertical_medium slds-is-relative">
-                        <lightning-spinner alternative-text="Loading incident timeline" size="small"></lightning-spinner>
-                    </div>
-                </template>
-
-                <template lwc:if={hasIncidentRows}>
-                    <lightning-datatable
-                        key-field="recordId"
-                        data={incidentRows}
-                        columns={incidentColumns}
-                        hide-checkbox-column
-                    ></lightning-datatable>
-                </template>
-                <template lwc:else>
-                    <p class="slds-text-body_small slds-text-color_weak slds-p-top_x-small">
-                        No audit events matched the selected incident window.
-                    </p>
-                </template>
-            </div>
-        </template>
     </div>
 </template>

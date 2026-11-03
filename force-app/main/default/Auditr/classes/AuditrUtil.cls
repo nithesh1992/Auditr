@@ -15,6 +15,7 @@ public with sharing class AuditrUtil {
     @TestVisible private static Auditr_Setting__mdt testSettingOverride;
     @TestVisible private static List<Auditr_Rule__mdt> testRulesOverride;
     private static List<Auditr_Rule__mdt> cachedActiveRules;
+    private static Id cachedSetupAuditTrailRecordTypeId;
 
     /**
      * @description Holds the resolved Category and Risk Level for an audit event.
@@ -81,6 +82,21 @@ public with sharing class AuditrUtil {
     }
 
     /**
+     * @description Returns the active Setup_Audit_Trail record type Id on Auditr_Entry__c (null when undeployed).
+     * Resolved via describe metadata (no SOQL) and cached per transaction.
+     * @return RecordType Id for the Setup_Audit_Trail record type, or null.
+     */
+    public static Id getSetupAuditTrailRecordTypeId() {
+        if (cachedSetupAuditTrailRecordTypeId == null) {
+            Schema.RecordTypeInfo recordTypeInfo = Schema.SObjectType.Auditr_Entry__c.getRecordTypeInfosByDeveloperName().get('Setup_Audit_Trail');
+            if (recordTypeInfo != null && recordTypeInfo.isActive()) {
+                cachedSetupAuditTrailRecordTypeId = recordTypeInfo.getRecordTypeId();
+            }
+        }
+        return cachedSetupAuditTrailRecordTypeId;
+    }
+
+    /**
      * @description Returns all active Auditr_Rule__mdt rules ordered by Priority__c ASC.
      * @return Ordered list of active Auditr_Rule__mdt records.
      */
@@ -126,6 +142,7 @@ public with sharing class AuditrUtil {
         ClassificationResult classification = classify(rawAudit.Action, sectionValue, rawAudit.ResponsibleNamespacePrefix, rawAudit.DelegateUser);
 
         return new Auditr_Entry__c(
+            RecordTypeId = getSetupAuditTrailRecordTypeId(),
             Source__c = DEFAULT_SOURCE,
             Source_Record_Id__c = String.valueOf(rawAudit.Id),
             Occurred_At__c = rawAudit.CreatedDate,

@@ -18,3 +18,4 @@ docs/.vitepress/cache/
 # Local Analyzer & Reference
 code-analyzer.yml
 .reference/
+concepts_brief.md

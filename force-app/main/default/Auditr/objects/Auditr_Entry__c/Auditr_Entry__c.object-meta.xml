@@ -143,7 +143,7 @@
     <allowInChatterGroups>false</allowInChatterGroups>
     <compactLayoutAssignment>SYSTEM</compactLayoutAssignment>
     <deploymentStatus>Deployed</deploymentStatus>
-    <description>The Auditr Entry object stores tamper-resistant Setup audit events linked to User, sourced from the standard SetupAuditTrail object. Commonly used for security monitoring, compliance auditing, and change reporting.</description>
+    <description>The Auditr Entry object stores audit events that normal use cannot edit or delete, linked to User. Entries are classified by risk and category, immutable after creation, packageable into change logs, and typed by record type (Setup Audit Trail default; Login History and Data Change reserved). Commonly used for audit retention, incident triage, and change governance.</description>
     <enableActivities>false</enableActivities>
     <enableBulkApi>true</enableBulkApi>
     <enableFeeds>false</enableFeeds>

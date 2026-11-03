@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>68.0</apiVersion>
+    <description>Audit Mode workspace: change log creation, unassigned change backlog review, and asynchronous change packaging with sign-off governance.</description>
+    <isExposed>true</isExposed>
+    <masterLabel>Auditr Audit Mode</masterLabel>
+    <targets>
+        <target>lightning__AppPage</target>
+        <target>lightning__HomePage</target>
+    </targets>
+</LightningComponentBundle>

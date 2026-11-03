@@ -1,6 +1,7 @@
 /**
  * @description Opt-in retention purge batch and schedulable job for Auditr_Entry__c.
  * Deletes records older than Retention_Days__c only when Enable_Purge__c is explicitly true.
+ * Entries cited by an Auditr Change Log are exempt: packaged compliance evidence is never purged.
  */
 public with sharing class AuditrPurgeBatch implements Database.Batchable<SObject>, Schedulable {
     /**
@@ -31,6 +32,7 @@ public with sharing class AuditrPurgeBatch implements Database.Batchable<SObject
             SELECT Id
             FROM Auditr_Entry__c
             WHERE Occurred_At__c < :cutoffDate
+                AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
             WITH SYSTEM_MODE
         ]);
     }

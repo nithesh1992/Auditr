@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Target_Actor__c</fullName>
+    <description>Responsible username filter captured when entries were packaged into this change log (blank for all actors).</description>
+    <externalId>false</externalId>
+    <inlineHelpText>The Responsible Username filter used during packaging. Blank means entries from all actors were included.</inlineHelpText>
+    <label>Target Actor</label>
+    <length>255</length>
+    <required>false</required>
+    <trackHistory>true</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

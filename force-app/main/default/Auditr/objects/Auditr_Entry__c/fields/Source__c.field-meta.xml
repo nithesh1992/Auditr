@@ -22,6 +22,11 @@
                 <default>false</default>
                 <label>LoginHistory</label>
             </value>
+            <value>
+                <fullName>DataChange</fullName>
+                <default>false</default>
+                <label>DataChange</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

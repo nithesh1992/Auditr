@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Compound_Key__c</fullName>
+    <description>Unique ChangeLog-Entry compound key stamped by AuditrChangeLogItemTriggerHandler; enforces one citation per entry per change log.</description>
+    <caseSensitive>true</caseSensitive>
+    <externalId>true</externalId>
+    <inlineHelpText>System-stamped as Change Log Id plus Entry Id.</inlineHelpText>
+    <label>Compound Key</label>
+    <length>40</length>
+    <required>false</required>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>true</unique>
+</CustomField>

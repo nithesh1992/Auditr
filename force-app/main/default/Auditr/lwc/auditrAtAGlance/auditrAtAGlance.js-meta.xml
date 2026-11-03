@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <LightningComponentBundle xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>68.0</apiVersion>
-    <description>At-a-Glance security KPI strip and Incident Mode timeline investigator for the Auditr Home page.</description>
+    <description>Executive security KPI strip for the Auditr Home page, including the Unassigned Changes compliance backlog metric.</description>
     <isExposed>true</isExposed>
     <masterLabel>Auditr At a Glance</masterLabel>
     <targets>

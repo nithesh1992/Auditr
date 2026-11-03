@@ -36,6 +36,7 @@ private class AuditrControllerTest {
         Assert.areEqual(0, sevenDayMetrics.automationAndMetadataCount, '0 entries should be Automation & Metadata');
         Assert.areEqual(2, sevenDayMetrics.impersonatedCount, '2 entries have Delegate_User__c populated');
         Assert.areEqual(1, sevenDayMetrics.unclassifiedCount, '1 entry is Unclassified');
+        Assert.areEqual(4, sevenDayMetrics.unassignedChangeCount, 'All 4 entries are unassigned when no change log cites them');
         Assert.areEqual(4, allTimeMetrics.totalEntries, 'All-time window should include all 4 entries');
         Assert.areEqual(3, incidentEvents.size(), 'Incident timeline with highRiskOnly=true should return 3 events');
 
@@ -76,5 +77,24 @@ private class AuditrControllerTest {
         Assert.isNotNull(syncJobId, 'runSyncNow should return a batch job Id');
         Assert.isNotNull(reclassifyJobId, 'runReclassify should return a batch job Id');
         Assert.isNotNull(purgeJobId, 'runPurgeNow should return a batch job Id');
+    }
+
+    @IsTest
+    private static void shouldDiscountPackagedEntries_WhenBacklogKpiQueried() {
+        List<Auditr_Entry__c> entries = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE ORDER BY Name ASC LIMIT 1];
+        Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
+        AuditrTestDataFactory.insertChangeLogItems(changeLog.Id, entries);
+        AuditrController.AtAGlanceDTO metrics;
+        DateTime watermark;
+
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+            Test.startTest();
+            metrics = AuditrController.getAtAGlanceMetrics(7);
+            watermark = AuditrController.getLatestSyncedOccurredAt();
+            Test.stopTest();
+        }
+
+        Assert.areEqual(3, metrics.unassignedChangeCount, 'Backlog KPI should exclude the 1 entry cited by a change log');
+        Assert.isNotNull(watermark, 'Latest synced watermark should be returned for lightweight LWC consumers');
     }
 }

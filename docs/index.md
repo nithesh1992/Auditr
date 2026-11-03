@@ -13,6 +13,9 @@ hero:
       text: Get Started
       link: /getting-started
     - theme: alt
+      text: Audit Mode & Change Packaging
+      link: /audit-mode
+    - theme: alt
       text: Control Center & Incident Mode
       link: /control-center-and-incident-mode
     - theme: alt
@@ -28,7 +31,11 @@ features:
   - title: Metadata-Driven Risk Engine
     details: Ships with 36 Auditr_Rule__mdt rules across Critical, High, Medium, and Low risk levels and 6 security domains, evaluated in priority order.
   - title: Incident Mode Investigator
-    details: Pinpoint what changed in your org within ±15m to ±4h of an outage or security incident with one-click filtering for Critical & High risk actions.
+    details: Pinpoint what changed in your org within ±15m to ±12h of an outage or security incident with one-click filtering for Critical & High risk actions.
+  - title: Audit Mode Change Packaging
+    details: Bundle audit events into sealed Auditr_Change_Log__c containers tied to mandatory Change Request numbers via asynchronous packaging — built for 10,000+ entry release windows.
+  - title: Unassigned Changes Backlog
+    details: SOX/SOC 2 governance view that surfaces every audit event with no change log citation as an unauthorized-change exception, on Home and in Audit Mode.
   - title: Blocks Edits & Deletes in Normal Use
     details: AuditrEntryTrigger blocks manual edits to source fields and blocks deletes unless AuditrPurgeBatch.execute is on the call stack.
   - title: Impersonation & Delegate Attribution
@@ -62,9 +69,9 @@ Install the Unlocked Package or deploy from source, assign `Auditr_Admin`, and s
 
 ::: code-group
 
-```bash [Install Package v1.0.0-5]
+```bash [Install Package v1.0.0-2]
 # Install the Unlocked Package
-sf package install --package 04tg7000000cCPxAAM --target-org <alias> --wait 10
+sf package install --package 04tg7000000cltxAAA --target-org <alias> --wait 10
 
 # Assign Admin permissions
 sf org assign permset --name Auditr_Admin --target-org <alias>

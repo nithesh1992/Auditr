@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Change_Log__c</fullName>
+    <description>The Auditr Change Log that cites this audit entry.</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Parent change log for this citation.</inlineHelpText>
+    <label>Change Log</label>
+    <referenceTo>Auditr_Change_Log__c</referenceTo>
+    <relationshipLabel>Change Log Items</relationshipLabel>
+    <relationshipName>Auditr_Change_Log_Items</relationshipName>
+    <relationshipOrder>0</relationshipOrder>
+    <reparentableMasterDetail>false</reparentableMasterDetail>
+    <trackTrending>false</trackTrending>
+    <type>MasterDetail</type>
+    <writeRequiresMasterRead>false</writeRequiresMasterRead>
+</CustomField>

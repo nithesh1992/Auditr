@@ -1,6 +1,6 @@
 # Architecture, Data Model & Considerations
 
-Auditr is intentionally compact — 6 production Apex classes, 1 trigger, 3 Lightning Web Components, 1 custom object, and 2 custom metadata types — so your security and engineering teams can audit the entire codebase in minutes.
+Auditr is intentionally compact — 10 production Apex classes, 3 triggers, 5 Lightning Web Components, 3 custom objects, 1 platform event, and 2 custom metadata types — so your security and engineering teams can audit the entire codebase in minutes.
 
 ---
 
@@ -11,13 +11,18 @@ force-app/main/default/Auditr/
 ├── applications/    Auditr Lightning App (branded with Auditr_Logo)
 ├── classes/         AuditrUtil · AuditrEntryTriggerHandler · AuditrSyncBatch
 │                    AuditrReclassifyBatch · AuditrPurgeBatch · AuditrController
-│                    + 5 test classes (90% package code coverage)
-├── triggers/        AuditrEntryTrigger (before update, before delete immutability)
-├── lwc/             auditrAtAGlance · auditrControlCenter · auditrRecordDetail
-├── objects/         Auditr_Entry__c · Auditr_Rule__mdt · Auditr_Setting__mdt
-├── layouts/         Auditr_Entry__c · Auditr_Rule__mdt · Auditr_Setting__mdt layouts
+│                    AuditrChangeLogController · AuditrChangeLogBatch
+│                    AuditrChangeLogTriggerHandler · AuditrChangeLogItemTriggerHandler
+│                    + 9 test classes (AuditrTestDataFactory, etc.)
+├── triggers/        AuditrEntryTrigger · AuditrChangeLogTrigger · AuditrChangeLogItemTrigger
+├── lwc/             auditrAtAGlance · auditrIncidentMode · auditrAuditMode
+│                    auditrControlCenter · auditrRecordDetail
+├── objects/         Auditr_Entry__c · Auditr_Change_Log__c · Auditr_Change_Log_Item__c
+│                    Auditr_Rule__mdt · Auditr_Setting__mdt
+├── layouts/         Auditr_Entry__c · Auditr_Change_Log__c · Rule/Setting layouts
 ├── customMetadata/  36 classification rules + Default setting
-├── flexipages/      Auditr_Home · Auditr_Control_Center · Auditr_Entry_Record_Page
+├── flexipages/      Auditr_Home · Auditr_Incident_Mode · Auditr_Audit_Mode
+│                    Auditr_Control_Center · Auditr_Entry_Record_Page
 ├── dashboards/      Auditr_Security_Dashboard (6 components)
 ├── reports/         6 audit & security reports
 └── permissionsets/  Auditr_Admin · Auditr_Viewer
@@ -33,9 +38,14 @@ flowchart LR
     UTIL -->|"Upsert by Source_Record_Id__c"| ENTRY[("Auditr_Entry__c")]
     TRIG["AuditrEntryTrigger"] -->|"Blocks Delete & Unauthorized Update"| ENTRY
     REC["AuditrReclassifyBatch"] -->|"Updates Category & Risk Only"| ENTRY
-    PURGE["AuditrPurgeBatch"] -->|"Deletes > Retention_Days__c"| ENTRY
-    ENTRY --> HOME["Auditr Home (At-a-Glance + Incident Mode + Dashboard)"]
+    PURGE["AuditrPurgeBatch"] -->|"Deletes > Retention_Days__c (packaged exempt)"| ENTRY
+    ENTRY --> HOME["Auditr Home (At-a-Glance KPIs + Dashboard)"]
+    ENTRY --> INC["Incident Mode (time-window triage)"]
+    ENTRY --> AM["Audit Mode (change packaging)"]
     ENTRY --> CC["Auditr Control Center"]
+    AM -->|"AuditrChangeLogBatch (async)"| ITEM[("Auditr_Change_Log_Item__c")]
+    LOG[("Auditr_Change_Log__c")] -->|"1:N citations"| ITEM
+    ITEM -->|"cites (M:N)"| ENTRY
 ```
 
 1. **Watermark Resolution (`AuditrSyncBatch.resolveCutoffTimestamp`)**:
@@ -69,13 +79,19 @@ flowchart LR
 | **Actor Context** | `Actor_Context__c` | Text(80) | `SetupAuditTrail.CreatedByContext` value. |
 | **Namespace Prefix** | `Namespace_Prefix__c` | Text(80) | `SetupAuditTrail.ResponsibleNamespacePrefix` value. |
 | **Display** | `Display__c` | Long Text Area(32768) | Full human-readable description of the setup change. |
-| **Source** | `Source__c` | Text(80) | Audit source (`SetupAuditTrail`). |
+| **Payload** | `Payload__c` | Long Text Area(32768) | Reserved compact JSON payload for Phase 2 high-velocity sources (unused for SetupAuditTrail). |
+| **Source** | `Source__c` | Picklist | Audit source (`SetupAuditTrail`; `LoginHistory` and `DataChange` reserved for Phase 2). |
 | **Source Record ID** | `Source_Record_Id__c` | Text(64) (External ID, Unique) | 18-character `SetupAuditTrail.Id` used for idempotent upserts. |
+
+`Auditr_Entry__c` also carries three record types — **Setup Audit Trail** (default for `AuditrSyncBatch`), **Login History**, and **Data Change** — as the Phase 2 multi-source ingestion foundation. For the change packaging schema, see [Audit Mode & Change Packaging](/audit-mode).
 
 ---
 
 ## Operational Considerations
 
 - **Large Data Volume (LDV) Query Caps**: To keep `auditrAtAGlance` and `auditrControlCenter` fast even in orgs with hundreds of thousands of setup changes, KPI `COUNT()` queries apply defensive `LIMIT` caps (`25,000` for total counts, `5,000` for category/risk KPIs, and `10,000` for 30-day unclassified aggregation).
+- **Asynchronous Packaging**: `AuditrChangeLogBatch` packages citations in bounded chunks with partial-success DML and per-chunk deduplication, so releases spanning 10,000+ changes never hit synchronous Apex DML limits. The workspace provides immediate feedback that the background packaging job is in flight.
+- **Junction Storage Cost**: Each `Auditr_Change_Log_Item__c` citation consumes ~2 KB (unavoidable for M:N multi-audit citation). Unpackaged entries consume zero citation storage; citations are created only when compliance teams package.
+- **Packaged Purge Exemption**: `AuditrPurgeBatch` excludes entries cited by any change log, so sealed compliance evidence is never deleted by retention policy.
 - **Scheduled Job Ownership**: If the admin user who scheduled `Auditr_Daily_Sync` or `Auditr_Daily_Purge` is later deactivated, the Control Center displays a prominent **Health Notice** banner prompting an active admin to click **Schedule Daily Sync** or **Schedule Daily Purge**.
 - **Storage Footprint**: Each `Auditr_Entry__c` record consumes standard Salesforce custom object storage (~2 KB per record). Use `Enable_Purge__c` and `Retention_Days__c` in `Auditr_Setting__mdt` to align storage usage with your compliance retention window.
