@@ -4,8 +4,8 @@
       "path": "force-app/main/default/Auditr",
       "default": true,
       "package": "Auditr",
-      "versionName": "v1.1",
-      "versionNumber": "1.1.0.NEXT",
+      "versionName": "v1.1.1",
+      "versionNumber": "1.1.1.NEXT",
       "versionDescription": "Lean, immutable Salesforce Setup Audit Trail intelligence and security monitoring framework."
     },
     {
