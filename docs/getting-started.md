@@ -29,7 +29,7 @@ Auditr ships with two permission sets following the principle of least privilege
 
 | Permission Set | API Name | Intended Audience |
 | :--- | :--- | :--- |
-| **Auditr Admin** | `Auditr_Admin` | Security administrators and release managers. Grants access to the **Auditr** Lightning App, **Auditr Home**, **Audit Mode** (investigation & change packaging), **Auditr Control Center**, batch execution, scheduling, and rule reclassification. |
+| **Auditr Admin** | `Auditr_Admin` | Security administrators and release managers. Grants access to the **Auditr** Lightning App, **Auditr Home**, **Audit Mode** (investigation & change packaging), **Auditr Control Center**, batch execution, scheduling, rule reclassification, and carries the dedicated `Auditr_Admin_Access` Custom Permission. |
 | **Auditr Viewer** | `Auditr_Viewer` | Compliance auditors and read-only reviewers. Grants read-only access to `Auditr_Entry__c`, `Auditr_Change_Log__c`, **Auditr Home**, **Audit Mode**, reports, and the security dashboard without packaging or Control Center actions. |
 
 ```bash

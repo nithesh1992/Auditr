@@ -59,6 +59,7 @@ The workspace is a single unified LWC (`auditrAuditMode`) integrating incident t
 The table displays all events in the filtered window, showing forensic details and a **Package Status** badge:
 - **Packaged Entries**: Show the external Change Request Id (e.g. `[ CR-10492 ]`) linking directly to the parent Change Log.
 - **Unassigned Entries**: Labeled `Unassigned`, immediately ready for packaging.
+- **Interactive Scope Bounding & Aggregates**: The interactive table renders up to 200 entries at a time to ensure instant UI responsiveness. When the filtered scope exceeds 200 events, a warning badge dynamically indicates `Showing first 200 of N events`. Aggregate counters (**Unassigned** and **Packaged**) reflect the full scope (up to 25,000 events), and **Package All Unassigned (M)** operates on the entire unassigned scope via asynchronous batch processing.
 
 ### 4. Scalable Modal-First Packaging Workflow
 The top change log table has been replaced with a streamlined, scalable modal:
@@ -71,9 +72,10 @@ The top change log table has been replaced with a streamlined, scalable modal:
 
 ---
 
-## Retention Interplay
+## Retention & Concurrency Interplay
 
-`AuditrPurgeBatch` **never purges packaged evidence**: its scope excludes any entry cited by a change log item. Retention purge only removes unpackaged entries older than `Retention_Days__c`.
+- **Packaged Evidence Exemption**: `AuditrPurgeBatch` **never purges packaged evidence** — its scope strictly excludes any entry cited by a change log item. Retention purge only removes unpackaged entries older than `Retention_Days__c`.
+- **In-Flight Packaging Seal Protection**: To eliminate packaging race conditions, an `Auditr_Change_Log__c` cannot transition to `Sealed` status while an asynchronous packaging batch (`Packaging_Job_Id__c`) is actively in flight. Any attempt to seal the change log before background packaging finishes is blocked by `AuditrChangeLogTriggerHandler`.
 
 ---
 

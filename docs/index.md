@@ -27,7 +27,7 @@ hero:
 
 features:
   - title: Beyond the 180-Day Cliff
-    details: Incrementally sync SetupAuditTrail into indexed Auditr_Entry__c records using a deduplicated External_Id__c watermark — no external SIEM required.
+    details: Incrementally sync SetupAuditTrail into indexed Auditr_Entry__c records using a deduplicated Source_Record_Id__c watermark — no external SIEM required.
   - title: Metadata-Driven Risk Engine
     details: Ships with 36 Auditr_Rule__mdt rules across Critical, High, Medium, and Low risk levels and 6 security domains, evaluated in priority order.
   - title: Incident Mode Investigator
@@ -69,9 +69,9 @@ Install the Unlocked Package or deploy from source, assign `Auditr_Admin`, and s
 
 ::: code-group
 
-```bash [Install Package v1.1.1-1]
+```bash [Install Package v1.2.0-1]
 # Install the Unlocked Package
-sf package install --package 04tg7000000coobAAA --target-org <alias> --wait 10
+sf package install --package 04tg7000000dK8XAAU --target-org <alias> --wait 10
 
 # Assign Admin permissions
 sf org assign permset --name Auditr_Admin --target-org <alias>
