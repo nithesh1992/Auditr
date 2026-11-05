@@ -85,4 +85,36 @@ private class AuditrChangeLogTriggerHandlerTest {
             'Delete error should state sealed change logs cannot be deleted'
         );
     }
+
+    @IsTest
+    private static void shouldBlockSeal_WhenPackagingBatchIsInFlight() {
+        Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
+        List<Auditr_Entry__c> entries = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE ORDER BY Name ASC LIMIT 2];
+        AuditrTestDataFactory.insertChangeLogItems(changeLog.Id, entries);
+
+        Id fakeJobId = '707000000000001AAA';
+        changeLog.Packaging_Job_Id__c = String.valueOf(fakeJobId);
+        Database.update(changeLog, AccessLevel.SYSTEM_MODE);
+
+        AuditrChangeLogTriggerHandler.testActiveJobIdsOverride = new Set<Id>{ fakeJobId };
+
+        changeLog.Status__c = AuditrChangeLogTriggerHandler.STATUS_SEALED;
+
+        Test.startTest();
+        DmlException sealError;
+        try {
+            Database.update(changeLog, AccessLevel.SYSTEM_MODE);
+        } catch (DmlException caught) {
+            sealError = caught;
+        } finally {
+            AuditrChangeLogTriggerHandler.testActiveJobIdsOverride = null;
+        }
+        Test.stopTest();
+
+        Assert.isNotNull(sealError, 'Sealing a change log with in-flight packaging should fail');
+        Assert.isTrue(
+            sealError.getMessage().contains(AuditrChangeLogTriggerHandler.SEAL_PACKAGING_IN_FLIGHT_ERROR),
+            'Error should indicate packaging is in flight'
+        );
+    }
 }

@@ -63,7 +63,18 @@ public with sharing class AuditrReclassifyBatch implements Database.Batchable<SO
             }
         }
         if (!entriesToUpdate.isEmpty()) {
-            Database.update(entriesToUpdate, false, AccessLevel.SYSTEM_MODE);
+            Database.SaveResult[] saveResults = Database.update(entriesToUpdate, false, AccessLevel.SYSTEM_MODE);
+            for (Integer i = 0; i < saveResults.size(); i++) {
+                Database.SaveResult sr = saveResults[i];
+                if (!sr.isSuccess()) {
+                    for (Database.Error err : sr.getErrors()) {
+                        System.debug(
+                            LoggingLevel.ERROR,
+                            'AuditrReclassifyBatch failed to update entry ' + entriesToUpdate[i].Id + ': ' + err.getMessage()
+                        );
+                    }
+                }
+            }
         }
     }
 

@@ -104,4 +104,44 @@ public with sharing class AuditrTestDataFactory {
             }
         }
     }
+
+    /**
+     * @description Constructs an in-memory SetupAuditTrail record via JSON deserialization
+     * so unit tests can run deterministically without querying live org history.
+     * @param index Numeric index for deterministic Id and attributes.
+     * @param action SetupAuditTrail Action string.
+     * @param section SetupAuditTrail Section string.
+     * @param display SetupAuditTrail Display string.
+     * @return Deserialized mock SetupAuditTrail instance.
+     */
+    public static SetupAuditTrail buildMockSetupAuditTrail(Integer index, String action, String section, String display) {
+        String fakeId = '0Aa' + String.valueOf(index).leftPad(15, '0');
+        Map<String, Object> data = new Map<String, Object>{
+            'attributes' => new Map<String, Object>{ 'type' => 'SetupAuditTrail' },
+            'Id' => fakeId,
+            'Action' => String.isNotBlank(action) ? action : 'suorgadminadd',
+            'Section' => String.isNotBlank(section) ? section : 'Manage Users',
+            'Display' => String.isNotBlank(display) ? display : 'Test audit action ' + index,
+            'CreatedDate' => System.now().addMinutes(-index).formatGmt('yyyy-MM-dd\'T\'HH:mm:ss.SSS\'Z\''),
+            'CreatedById' => UserInfo.getUserId(),
+            'CreatedBy' => new Map<String, Object>{ 'Username' => 'admin.' + index + '@example.com' },
+            'DelegateUser' => (Math.mod(index, 2) == 0) ? 'delegate.' + index + '@example.com' : null,
+            'ResponsibleNamespacePrefix' => null,
+            'CreatedByContext' => 'InternalUser'
+        };
+        return (SetupAuditTrail) JSON.deserialize(JSON.serialize(data), SetupAuditTrail.class);
+    }
+
+    /**
+     * @description Builds a list of in-memory SetupAuditTrail records for deterministic batch testing.
+     * @param count Number of mock SetupAuditTrail records to construct.
+     * @return List of mock SetupAuditTrail instances.
+     */
+    public static List<SetupAuditTrail> buildMockSetupAuditTrails(Integer count) {
+        List<SetupAuditTrail> rows = new List<SetupAuditTrail>();
+        for (Integer i = 1; i <= count; i++) {
+            rows.add(buildMockSetupAuditTrail(i, 'suorgadminadd', 'Manage Users', 'Added user test' + i));
+        }
+        return rows;
+    }
 }

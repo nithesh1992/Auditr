@@ -89,4 +89,27 @@ private class AuditrChangeLogBatchTest {
             'Filter packaging should cite only unassigned entries, skipping the one already cited by another log'
         );
     }
+
+    @IsTest
+    private static void shouldSkipChunk_WhenTargetChangeLogIsSealed() {
+        Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
+        List<Auditr_Entry__c> entries = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE ORDER BY Name ASC LIMIT 2];
+        AuditrTestDataFactory.insertChangeLogItems(changeLog.Id, new List<Auditr_Entry__c>{ entries[0] });
+
+        changeLog.Status__c = 'Sealed';
+        Database.update(changeLog, AccessLevel.SYSTEM_MODE);
+
+        AuditrChangeLogBatch batch = new AuditrChangeLogBatch(changeLog.Id, new Set<Id>{ entries[1].Id });
+
+        Test.startTest();
+        batch.execute(null, new List<Auditr_Entry__c>{ entries[1] });
+        batch.finish(null);
+        Test.stopTest();
+
+        Assert.areEqual(
+            1,
+            [SELECT COUNT() FROM Auditr_Change_Log_Item__c WHERE Change_Log__c = :changeLog.Id WITH SYSTEM_MODE],
+            'Sealed change log should reject in-flight execution chunk'
+        );
+    }
 }

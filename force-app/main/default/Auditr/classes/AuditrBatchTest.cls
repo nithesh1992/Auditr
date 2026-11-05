@@ -6,14 +6,7 @@
 private class AuditrBatchTest {
     @IsTest
     private static void shouldIngestAndDeduplicateSetupAuditTrail_WhenAuditrSyncBatchRuns() {
-        List<SetupAuditTrail> sampleAuditRows = [
-            SELECT Id, Action, Section, CreatedDate, CreatedById, CreatedBy.Username,
-                   Display, DelegateUser, ResponsibleNamespacePrefix, CreatedByContext
-            FROM SetupAuditTrail
-            WITH SYSTEM_MODE
-            ORDER BY CreatedDate DESC
-            LIMIT 5
-        ];
+        List<SetupAuditTrail> sampleAuditRows = AuditrTestDataFactory.buildMockSetupAuditTrails(5);
 
         Test.startTest();
         Integer firstInsertCount = AuditrSyncBatch.processAuditRecords(sampleAuditRows);
@@ -25,10 +18,30 @@ private class AuditrBatchTest {
         syncBatch.finish(null);
         Test.stopTest();
 
-        Assert.areEqual(sampleAuditRows.size(), firstInsertCount, 'First sync pass should insert all sampled SetupAuditTrail records');
+        Assert.areEqual(5, firstInsertCount, 'First sync pass should insert all 5 mock SetupAuditTrail records');
         Assert.areEqual(0, duplicateInsertCount, 'Second sync pass on identical records should skip all duplicates');
         Assert.isNotNull(watermarkCutoff, 'Watermark cutoff should be resolved from existing Auditr_Entry__c records');
         Assert.isNotNull(locator, 'QueryLocator should be returned by start()');
+    }
+
+    @IsTest
+    private static void shouldHandlePartialDmlFailuresAndLogErrors_WhenIngestionEncountersInvalidRow() {
+        List<SetupAuditTrail> mixedRows = new List<SetupAuditTrail>{
+            AuditrTestDataFactory.buildMockSetupAuditTrail(801, 'suorgadminadd', 'Manage Users', 'Valid row 1'),
+            AuditrTestDataFactory.buildMockSetupAuditTrail(802, 'a'.repeat(200), 'Manage Users', 'Invalid long action row')
+        };
+
+        Test.startTest();
+        Integer insertedCount = AuditrSyncBatch.processAuditRecords(mixedRows);
+        Test.stopTest();
+
+        Assert.areEqual(1, insertedCount, 'Only the valid record should be counted as successfully inserted');
+        String expectedSourceId = String.valueOf(mixedRows[0].Id);
+        Assert.areEqual(
+            1,
+            [SELECT COUNT() FROM Auditr_Entry__c WHERE Source_Record_Id__c = :expectedSourceId WITH SYSTEM_MODE],
+            'Valid record must exist in the database'
+        );
     }
 
     @IsTest

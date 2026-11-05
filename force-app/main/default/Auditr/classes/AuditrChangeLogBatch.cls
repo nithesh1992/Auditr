@@ -60,11 +60,17 @@ public with sharing class AuditrChangeLogBatch implements Database.Batchable<SOb
     }
 
     /**
-     * @description Inserts deduplicated change log items for each chunk with partial-success DML.
+     * @description Inserts deduplicated change log items for each chunk with partial-success DML and error logging.
      * @param context BatchableContext provided by the platform.
      * @param scope Chunk of Auditr_Entry__c records.
      */
     public void execute(Database.BatchableContext context, List<SObject> scope) {
+        Auditr_Change_Log__c targetLog = queryChangeLog();
+        if (targetLog.Status__c == AuditrChangeLogTriggerHandler.STATUS_SEALED) {
+            System.debug(LoggingLevel.WARN, 'AuditrChangeLogBatch skipping chunk: target change log ' + changeLogId + ' is already sealed.');
+            return;
+        }
+
         Set<Id> scopeEntryIds = new Map<Id, SObject>(scope).keySet();
         Set<Id> alreadyCited = queryAlreadyCited(scopeEntryIds);
 
@@ -77,7 +83,18 @@ public with sharing class AuditrChangeLogBatch implements Database.Batchable<SOb
         if (newItems.isEmpty()) {
             return;
         }
-        Database.insert(newItems, false, AccessLevel.SYSTEM_MODE);
+        Database.SaveResult[] saveResults = Database.insert(newItems, false, AccessLevel.SYSTEM_MODE);
+        for (Integer i = 0; i < saveResults.size(); i++) {
+            Database.SaveResult sr = saveResults[i];
+            if (!sr.isSuccess()) {
+                for (Database.Error err : sr.getErrors()) {
+                    System.debug(
+                        LoggingLevel.ERROR,
+                        'AuditrChangeLogBatch failed to cite entry ' + newItems[i].Entry__c + ': ' + err.getMessage()
+                    );
+                }
+            }
+        }
     }
 
     /**

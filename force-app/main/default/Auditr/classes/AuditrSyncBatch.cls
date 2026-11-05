@@ -54,8 +54,9 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
 
     /**
      * @description Deduplicates and inserts new Auditr_Entry__c records from a list of SetupAuditTrail rows.
+     * Inspects partial-success DML results, logs failures, and returns the true successfully inserted count.
      * @param auditRecords List of SetupAuditTrail records to ingest.
-     * @return Number of new Auditr_Entry__c records inserted.
+     * @return Number of new Auditr_Entry__c records successfully inserted.
      */
     public static Integer processAuditRecords(List<SetupAuditTrail> auditRecords) {
         if (auditRecords == null || auditRecords.isEmpty()) {
@@ -80,10 +81,27 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
             }
         }
 
-        if (!newEntries.isEmpty()) {
-            Database.insert(newEntries, false, AccessLevel.SYSTEM_MODE);
+        if (newEntries.isEmpty()) {
+            return 0;
         }
-        return newEntries.size();
+
+        Database.SaveResult[] saveResults = Database.insert(newEntries, false, AccessLevel.SYSTEM_MODE);
+        Integer successCount = 0;
+        for (Integer i = 0; i < saveResults.size(); i++) {
+            Database.SaveResult sr = saveResults[i];
+            if (sr.isSuccess()) {
+                successCount++;
+            } else {
+                for (Database.Error err : sr.getErrors()) {
+                    System.debug(
+                        LoggingLevel.ERROR,
+                        'AuditrSyncBatch failed to insert row for sourceId ' +
+                        newEntries[i].Source_Record_Id__c + ': ' + err.getMessage()
+                    );
+                }
+            }
+        }
+        return successCount;
     }
 
     @TestVisible
