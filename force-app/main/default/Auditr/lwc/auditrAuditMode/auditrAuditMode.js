@@ -2,6 +2,7 @@ import { LightningElement, wire } from 'lwc';
 import { refreshApex } from '@salesforce/apex';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getAuditEntries from '@salesforce/apex/AuditrChangeLogController.getAuditEntries';
+import getAuditEntriesWithContinuation from '@salesforce/apex/AuditrChangeLogController.getAuditEntriesWithContinuation';
 import searchDraftChangeLogs from '@salesforce/apex/AuditrChangeLogController.searchDraftChangeLogs';
 import createChangeLog from '@salesforce/apex/AuditrChangeLogController.createChangeLog';
 import packageEntries from '@salesforce/apex/AuditrChangeLogController.packageEntries';
@@ -123,6 +124,10 @@ export default class AuditrAuditMode extends LightningElement {
     scopePackagedCount = 0;
     isScopeCapped = false;
     queryLimit = 200;
+    hasMore = false;
+    lastOccurredAt = null;
+    lastEntryId = null;
+    isLoadingMore = false;
 
     // Modal state
     isPackageModalOpen = false;
@@ -176,12 +181,18 @@ export default class AuditrAuditMode extends LightningElement {
                 this.scopePackagedCount = this.entryRows.filter((e) => e.isPackaged).length;
                 this.isScopeCapped = false;
                 this.queryLimit = 200;
+                this.hasMore = false;
+                this.lastOccurredAt = null;
+                this.lastEntryId = null;
             } else {
                 this.scopeTotalCount = data.totalMatchingCount ?? this.entryRows.length;
                 this.scopeUnassignedCount = data.totalUnassignedCount ?? this.entryRows.filter((e) => !e.isPackaged).length;
                 this.scopePackagedCount = data.totalPackagedCount ?? this.entryRows.filter((e) => e.isPackaged).length;
                 this.isScopeCapped = data.isCapped ?? false;
                 this.queryLimit = data.queryLimit ?? 200;
+                this.hasMore = data.hasMore ?? false;
+                this.lastOccurredAt = data.lastOccurredAt ?? null;
+                this.lastEntryId = data.lastEntryId ?? null;
             }
             this.errorMessage = '';
             this.syncGridSelectedRows();
@@ -247,6 +258,14 @@ export default class AuditrAuditMode extends LightningElement {
     get formattedPackagedCount() {
         const formatted = new Intl.NumberFormat().format(this.packagedCount);
         return this.isScopeCapped ? `${formatted}+` : formatted;
+    }
+
+    get hasMoreEntries() {
+        return this.hasMore && !this.isLoading;
+    }
+
+    get loadMoreLabel() {
+        return this.isLoadingMore ? 'Loading Next 200 Events...' : 'Load Next 200 Events';
     }
 
     get packageSelectedLabel() {
@@ -420,6 +439,51 @@ export default class AuditrAuditMode extends LightningElement {
             await refreshApex(this.wiredEntriesResult);
         }
         this.isLoading = false;
+    }
+
+    async handleLoadMore() {
+        if (!this.hasMore || this.isLoadingMore) {
+            return;
+        }
+        this.isLoadingMore = true;
+        try {
+            const nextEnvelope = await getAuditEntriesWithContinuation({
+                windowStart: this.windowStart,
+                windowEnd: this.windowEnd,
+                actorUsername: this.actorUsername,
+                highRiskOnly: this.appliedHighRiskOnly,
+                continuationOccurredAt: this.lastOccurredAt,
+                continuationId: this.lastEntryId
+            });
+
+            if (nextEnvelope && Array.isArray(nextEnvelope.entries)) {
+                const newRows = nextEnvelope.entries.map((row) => ({
+                    ...row,
+                    displayName: row.name,
+                    recordUrl: `/${row.recordId}`,
+                    changeRequestUrl: row.changeLogId ? `/${row.changeLogId}` : null,
+                    changeRequestDisplay: row.isPackaged ? (row.changeRequestId || row.changeLogName || 'Packaged') : 'Unassigned'
+                }));
+
+                this.entryRows = [...this.entryRows, ...newRows];
+                this.hasMore = nextEnvelope.hasMore ?? false;
+                this.lastOccurredAt = nextEnvelope.lastOccurredAt ?? null;
+                this.lastEntryId = nextEnvelope.lastEntryId ?? null;
+                this.syncGridSelectedRows();
+            } else {
+                this.hasMore = false;
+            }
+        } catch (error) {
+            this.dispatchEvent(
+                new ShowToastEvent({
+                    title: 'Error loading additional events',
+                    message: this.extractError(error),
+                    variant: 'error'
+                })
+            );
+        } finally {
+            this.isLoadingMore = false;
+        }
     }
 
     // Modal Workflow

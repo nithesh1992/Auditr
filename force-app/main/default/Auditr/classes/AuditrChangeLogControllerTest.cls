@@ -314,4 +314,34 @@ private class AuditrChangeLogControllerTest {
         Assert.isNotNull(highRiskEnvelope.totalMatchingCount, 'High risk matching count must be computed');
         Assert.isNotNull(actorHighRiskEnvelope.totalMatchingCount, 'Actor high risk matching count must be computed');
     }
+
+    @IsTest
+    private static void shouldReturnContinuationSlice_WhenKeysetProvided() {
+        User currentUser = [SELECT Id, Username FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO firstEnvelope;
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO nextEnvelope;
+
+        System.runAs(currentUser) {
+            AuditrChangeLogController.entryQueryLimit = 2;
+            Test.startTest();
+            firstEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, false);
+            nextEnvelope = AuditrChangeLogController.getAuditEntriesWithContinuation(
+                System.now().addDays(-7),
+                System.now().addDays(1),
+                null,
+                false,
+                firstEnvelope.lastOccurredAt,
+                firstEnvelope.lastEntryId
+            );
+            Test.stopTest();
+            AuditrChangeLogController.entryQueryLimit = 200;
+        }
+
+        Assert.areEqual(2, firstEnvelope.entries.size(), 'First slice should return 2 entries');
+        Assert.isTrue(firstEnvelope.hasMore, 'First slice should report hasMore == true when more exist');
+        Assert.isNotNull(firstEnvelope.lastOccurredAt, 'First slice should report lastOccurredAt');
+        Assert.isNotNull(firstEnvelope.lastEntryId, 'First slice should report lastEntryId');
+        Assert.isNotNull(nextEnvelope, 'Next envelope should be returned');
+        Assert.isFalse(nextEnvelope.entries.isEmpty(), 'Next slice should contain subsequent entries');
+    }
 }

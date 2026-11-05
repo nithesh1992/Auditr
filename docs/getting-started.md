@@ -7,7 +7,7 @@ You can install Auditr either as a versioned **Unlocked Package** or by deployin
 ::: code-group
 
 ```bash [Unlocked Package (Recommended)]
-sf package install --package 04tg7000000dK8XAAU --wait 10 --target-org <org-alias>
+sf package install --package 04tg7000000dLJ7AAM --wait 10 --target-org <org-alias>
 ```
 
 ```bash [Deploy from Source]
@@ -20,8 +20,8 @@ sf project deploy start --source-dir force-app/main/default/Auditr --target-org 
 
 Or install directly in the browser:
 
-- **Production / Developer Edition**: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000dK8XAAU`
-- **Sandbox / Scratch Org**: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000dK8XAAU`
+- **Production / Developer Edition**: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000dLJ7AAM`
+- **Sandbox / Scratch Org**: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000dLJ7AAM`
 
 ## 2. Assign Permission Sets
 
@@ -48,7 +48,7 @@ sf org assign permset --name Auditr_Viewer --target-org <org-alias>
 4. In the green **Daily Sync Hour (Org Time Zone)** card, select your preferred hour (default `02:00`) and click **Schedule Daily Sync**.
 
 ::: tip Safe Incremental Watermark
-You can click **Sync Now** as often as you want. `AuditrSyncBatch` queries `SetupAuditTrail` from the latest `Occurred_At__c` watermark (minus a 2-day overlap buffer) and deduplicates against `Source_Record_Id__c` before insertion (`Database.insert(..., false)`), inspecting row-level `SaveResult` records to guarantee zero duplicate `Auditr_Entry__c` rows and record accurate outcomes.
+You can click **Sync Now** as often as you want. `AuditrSyncBatch` queries `SetupAuditTrail` from the latest `Occurred_At__c` watermark (minus a 2-day overlap buffer) and deduplicates against `Source_Record_Id__c` before insertion (`Database.insert(..., false)`), inspecting row-level `SaveResult` records to prevent duplicate `Auditr_Entry__c` rows and record accurate outcomes.
 :::
 
 ## 4. Explore Auditr Home & Reports

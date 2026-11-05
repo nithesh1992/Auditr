@@ -112,4 +112,41 @@ private class AuditrChangeLogBatchTest {
             'Sealed change log should reject in-flight execution chunk'
         );
     }
+
+    @IsTest
+    private static void shouldStampPackagingWarningAndThrow_WhenCitationsFail() {
+        Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
+        changeLog.Description__c = 'Original approved change description.';
+        Database.update(changeLog, AccessLevel.SYSTEM_MODE);
+
+        AuditrChangeLogBatch batch = new AuditrChangeLogBatch(changeLog.Id);
+        batch.totalFailedCitations = 2;
+        batch.firstErrorMessage = 'Simulated citation insertion failure';
+
+        Test.startTest();
+        AuditrChangeLogBatch.AuditrChangeLogBatchException caughtEx;
+        try {
+            batch.finish(null);
+        } catch (AuditrChangeLogBatch.AuditrChangeLogBatchException ex) {
+            caughtEx = ex;
+        }
+        Test.stopTest();
+
+        Assert.isNotNull(caughtEx, 'AuditrChangeLogBatchException must be thrown when totalFailedCitations > 0');
+        Assert.isTrue(caughtEx.getMessage().contains('2 failed citation'), 'Exception message should report failed citation count');
+
+        Auditr_Change_Log__c updated = [
+            SELECT Description__c, Packaging_Job_Id__c
+            FROM Auditr_Change_Log__c WHERE Id = :changeLog.Id WITH SYSTEM_MODE
+        ];
+        Assert.isTrue(
+            updated.Description__c.contains('[PACKAGING WARNING: 2 citation(s) failed to insert. First error: Simulated citation insertion failure]'),
+            'Description must contain packaging warning header'
+        );
+        Assert.isTrue(
+            updated.Description__c.contains('Original approved change description.'),
+            'Original description must be preserved after the warning header'
+        );
+        Assert.isNull(updated.Packaging_Job_Id__c, 'In-flight packaging job pointer must be cleared');
+    }
 }

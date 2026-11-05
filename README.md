@@ -113,14 +113,14 @@ By default, Auditr retains all `Auditr_Entry__c` records indefinitely (`Enable_P
 
 ## Install
 
-**Unlocked package (`Auditr@1.2.0-1`)**
+**Unlocked package (`Auditr@1.2.1-1`)**
 
 ```bash
-sf package install --package 04tg7000000dK8XAAU --target-org <alias> --wait 10
+sf package install --package 04tg7000000dLJ7AAM --target-org <alias> --wait 10
 ```
 
-Production: <https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000dK8XAAU>  
-Sandbox: <https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000dK8XAAU>
+Production: <https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000dLJ7AAM>  
+Sandbox: <https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000dLJ7AAM>
 
 **From source**
 

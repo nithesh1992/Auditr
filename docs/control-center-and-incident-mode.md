@@ -76,7 +76,7 @@ Below the summary cards, a two-column schedule grid separates ingestion from ret
 
 ## 5. Custom Read-Only Record Detail (`auditrRecordDetail`)
 
-Standard Salesforce record pages display inline-edit pencil icons on fields the user has object-level edit access to. To guarantee audit integrity in the UI while still supporting administrative reclassification:
+Standard Salesforce record pages display inline-edit pencil icons on fields the user has object-level edit access to. To enforce audit integrity in the UI while still supporting administrative reclassification:
 
 - `auditrRecordDetail` replaces the standard record detail component on `Auditr_Entry_Record_Page`.
 - Every provenance field (**Occurred At**, **Action Code**, **Setup Section**, **Responsible Username**, **Actor Username**, **Delegate User**, **Actor Context**, **Source Record ID**, **Display**) is rendered strictly read-only with zero inline-edit pencils.

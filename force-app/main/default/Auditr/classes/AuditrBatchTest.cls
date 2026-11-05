@@ -141,4 +141,42 @@ private class AuditrBatchTest {
         Assert.areEqual(0, remainingUnassigned, 'Expired unassigned entry should be purged');
         Assert.areEqual(1, remainingPackaged, 'Entries cited by a change log must be exempt from retention purge');
     }
+
+    @IsTest
+    private static void shouldThrowSyncExceptionInFinish_WhenRowLevelErrorsRecorded() {
+        AuditrSyncBatch syncBatch = new AuditrSyncBatch();
+        syncBatch.totalFailedInserts = 3;
+        syncBatch.firstInsertErrorMessage = 'Simulated DML failure';
+
+        Test.startTest();
+        AuditrSyncBatch.AuditrSyncException caughtEx;
+        try {
+            syncBatch.finish(null);
+        } catch (AuditrSyncBatch.AuditrSyncException ex) {
+            caughtEx = ex;
+        }
+        Test.stopTest();
+
+        Assert.isNotNull(caughtEx, 'AuditrSyncException must be thrown when totalFailedInserts > 0');
+        Assert.isTrue(caughtEx.getMessage().contains('Simulated DML failure'), 'Exception message should contain first error');
+    }
+
+    @IsTest
+    private static void shouldThrowReclassifyExceptionInFinish_WhenUpdateErrorsRecorded() {
+        AuditrReclassifyBatch reclassifyBatch = new AuditrReclassifyBatch();
+        reclassifyBatch.totalFailed = 2;
+        reclassifyBatch.firstErrorMessage = 'Simulated reclassify update failure';
+
+        Test.startTest();
+        AuditrReclassifyBatch.AuditrReclassifyException caughtEx;
+        try {
+            reclassifyBatch.finish(null);
+        } catch (AuditrReclassifyBatch.AuditrReclassifyException ex) {
+            caughtEx = ex;
+        }
+        Test.stopTest();
+
+        Assert.isNotNull(caughtEx, 'AuditrReclassifyException must be thrown when totalFailed > 0');
+        Assert.isTrue(caughtEx.getMessage().contains('Simulated reclassify update failure'), 'Exception message should contain first error');
+    }
 }

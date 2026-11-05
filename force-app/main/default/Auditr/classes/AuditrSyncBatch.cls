@@ -2,8 +2,22 @@
  * @description Schedulable and Batchable job that ingests new SetupAuditTrail rows into Auditr_Entry__c
  * using an indexed CreatedDate watermark with a 2-day overlap window and per-chunk deduplication.
  */
-public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>, Schedulable {
+public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>, Database.Stateful, Schedulable {
     private static final Integer OVERLAP_DAYS = 2;
+
+    public class AuditrSyncException extends Exception {}
+
+    /** @description Structured result of an audit trail ingestion slice. */
+    public class IngestResult {
+        public Integer successCount = 0;
+        public Integer failedCount = 0;
+        public String firstErrorMessage;
+    }
+
+    @TestVisible private Integer totalSourceProcessed = 0;
+    @TestVisible private Integer totalSuccessfullyInserted = 0;
+    @TestVisible private Integer totalFailedInserts = 0;
+    @TestVisible private String firstInsertErrorMessage;
 
     /**
      * @description Schedulable entry point; executes AuditrSyncBatch when Auditr_Setting__mdt.Is_Active__c is true.
@@ -38,14 +52,28 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
      * @param scope Chunk of SetupAuditTrail records.
      */
     public void execute(Database.BatchableContext context, List<SObject> scope) {
-        processAuditRecords((List<SetupAuditTrail>) scope);
+        IngestResult result = processAuditRecordsWithResult((List<SetupAuditTrail>) scope);
+        totalSourceProcessed += scope.size();
+        totalSuccessfullyInserted += result.successCount;
+        totalFailedInserts += result.failedCount;
+        if (firstInsertErrorMessage == null && result.firstErrorMessage != null) {
+            firstInsertErrorMessage = result.firstErrorMessage;
+        }
     }
 
     /**
      * @description Chains AuditrPurgeBatch when opt-in retention purging is enabled in Auditr_Setting__mdt.
+     * If row-level insert failures occurred during ingestion, throws AuditrSyncException so the job
+     * is durably marked as Failed in AsyncApexJob and surfaces in the Control Center.
      * @param context BatchableContext provided by the platform.
      */
     public void finish(Database.BatchableContext context) {
+        if (totalFailedInserts > 0) {
+            throw new AuditrSyncException(
+                'AuditrSyncBatch encountered ' + totalFailedInserts +
+                ' failed record inserts during ingestion. First error: ' + firstInsertErrorMessage
+            );
+        }
         Auditr_Setting__mdt setting = AuditrUtil.getSetting();
         if (!Test.isRunningTest() && setting.Enable_Purge__c == true && setting.Retention_Days__c != null && setting.Retention_Days__c > 0) {
             Database.executeBatch(new AuditrPurgeBatch(), AuditrUtil.getBatchSize());
@@ -54,13 +82,14 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
 
     /**
      * @description Deduplicates and inserts new Auditr_Entry__c records from a list of SetupAuditTrail rows.
-     * Inspects partial-success DML results, logs failures, and returns the true successfully inserted count.
+     * Inspects partial-success DML results, logs failures, and returns structured success/failure counts.
      * @param auditRecords List of SetupAuditTrail records to ingest.
-     * @return Number of new Auditr_Entry__c records successfully inserted.
+     * @return IngestResult with successCount, failedCount, and firstErrorMessage.
      */
-    public static Integer processAuditRecords(List<SetupAuditTrail> auditRecords) {
+    public static IngestResult processAuditRecordsWithResult(List<SetupAuditTrail> auditRecords) {
+        IngestResult result = new IngestResult();
         if (auditRecords == null || auditRecords.isEmpty()) {
-            return 0;
+            return result;
         }
 
         Set<String> candidateSourceIds = new Set<String>();
@@ -82,17 +111,20 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
         }
 
         if (newEntries.isEmpty()) {
-            return 0;
+            return result;
         }
 
         Database.SaveResult[] saveResults = Database.insert(newEntries, false, AccessLevel.SYSTEM_MODE);
-        Integer successCount = 0;
         for (Integer i = 0; i < saveResults.size(); i++) {
             Database.SaveResult sr = saveResults[i];
             if (sr.isSuccess()) {
-                successCount++;
+                result.successCount++;
             } else {
+                result.failedCount++;
                 for (Database.Error err : sr.getErrors()) {
+                    if (result.firstErrorMessage == null) {
+                        result.firstErrorMessage = err.getMessage();
+                    }
                     System.debug(
                         LoggingLevel.ERROR,
                         'AuditrSyncBatch failed to insert row for sourceId ' +
@@ -101,7 +133,16 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
                 }
             }
         }
-        return successCount;
+        return result;
+    }
+
+    /**
+     * @description Backward-compatible helper returning successfully inserted count.
+     * @param auditRecords List of SetupAuditTrail records to ingest.
+     * @return Number of new Auditr_Entry__c records successfully inserted.
+     */
+    public static Integer processAuditRecords(List<SetupAuditTrail> auditRecords) {
+        return processAuditRecordsWithResult(auditRecords).successCount;
     }
 
     @TestVisible

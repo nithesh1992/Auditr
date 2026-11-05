@@ -6,7 +6,7 @@ public with sharing class AuditrChangeLogController {
     private static final Integer CHANGE_LOG_LIMIT = 200;
     @TestVisible
     private static Integer entryQueryLimit = 200;
-    private static final Integer BACKLOG_COUNT_CAP = 25000;
+    private static final Integer BACKLOG_COUNT_CAP = 5000;
     private static final Integer DEFAULT_WINDOW_DAYS = 30;
     public static final String CUSTOM_PERM_ADMIN_ACCESS = 'Auditr_Admin_Access';
     private static final String ERROR_LOG_NOT_DRAFT = 'Only Draft change logs can accept packaged entries.';
@@ -65,6 +65,9 @@ public with sharing class AuditrChangeLogController {
         @AuraEnabled public Integer totalPackagedCount;
         @AuraEnabled public Boolean isCapped;
         @AuraEnabled public Integer queryLimit;
+        @AuraEnabled public Boolean hasMore;
+        @AuraEnabled public DateTime lastOccurredAt;
+        @AuraEnabled public Id lastEntryId;
     }
 
     /** @description Unassigned audit entry row eligible for packaging. */
@@ -189,49 +192,35 @@ public with sharing class AuditrChangeLogController {
      */
     @AuraEnabled(cacheable=true)
     public static AuditEntriesEnvelopeDTO getAuditEntries(DateTime windowStart, DateTime windowEnd, String actorUsername, Boolean highRiskOnly) {
+        return getAuditEntriesWithContinuation(windowStart, windowEnd, actorUsername, highRiskOnly, null, null);
+    }
+
+    /**
+     * @description Returns audit entries matching criteria with keyset pagination continuation support.
+     * @param windowStart Inclusive Occurred_At__c lower bound.
+     * @param windowEnd Inclusive Occurred_At__c upper bound.
+     * @param actorUsername Optional exact Responsible_Username__c filter.
+     * @param highRiskOnly When true, filters to Critical and High risk entries only.
+     * @param continuationOccurredAt Last Occurred_At__c received from previous page (for keyset pagination).
+     * @param continuationId Last record Id received from previous page (for keyset pagination tie-breaking).
+     * @return AuditEntriesEnvelopeDTO with next slice and continuation markers.
+     */
+    @AuraEnabled(cacheable=true)
+    @SuppressWarnings('PMD.ExcessiveParameterList')
+    public static AuditEntriesEnvelopeDTO getAuditEntriesWithContinuation(
+        DateTime windowStart,
+        DateTime windowEnd,
+        String actorUsername,
+        Boolean highRiskOnly,
+        DateTime continuationOccurredAt,
+        Id continuationId
+    ) {
         DateTime effectiveStart = resolveWindowStart(windowStart);
         DateTime effectiveEnd = resolveWindowEnd(windowEnd);
         String actor = normalizeActor(actorUsername);
         List<String> allowedRisks = (highRiskOnly == true) ? new List<String>{ 'Critical', 'High' } : null;
 
-        List<Auditr_Entry__c> entries;
-        if (actor == null && allowedRisks == null) {
-            entries = [
-                SELECT Id, Name, Occurred_At__c, Risk_Level__c, Category__c, Section__c, Action_Code__c, Responsible_Username__c, Delegate_User__c, Display__c,
-                       (SELECT Id, Change_Log__c, Change_Log__r.Name, Change_Log__r.Change_Request_Id__c, Change_Log__r.Status__c FROM Auditr_Change_Log_Items__r ORDER BY CreatedDate DESC LIMIT 1)
-                FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :entryQueryLimit
-            ];
-        } else if (actor != null && allowedRisks == null) {
-            entries = [
-                SELECT Id, Name, Occurred_At__c, Risk_Level__c, Category__c, Section__c, Action_Code__c, Responsible_Username__c, Delegate_User__c, Display__c,
-                       (SELECT Id, Change_Log__c, Change_Log__r.Name, Change_Log__r.Change_Request_Id__c, Change_Log__r.Status__c FROM Auditr_Change_Log_Items__r ORDER BY CreatedDate DESC LIMIT 1)
-                FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                  AND Responsible_Username__c = :actor
-                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :entryQueryLimit
-            ];
-        } else if (actor == null && allowedRisks != null) {
-            entries = [
-                SELECT Id, Name, Occurred_At__c, Risk_Level__c, Category__c, Section__c, Action_Code__c, Responsible_Username__c, Delegate_User__c, Display__c,
-                       (SELECT Id, Change_Log__c, Change_Log__r.Name, Change_Log__r.Change_Request_Id__c, Change_Log__r.Status__c FROM Auditr_Change_Log_Items__r ORDER BY CreatedDate DESC LIMIT 1)
-                FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                  AND Risk_Level__c IN :allowedRisks
-                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :entryQueryLimit
-            ];
-        } else {
-            entries = [
-                SELECT Id, Name, Occurred_At__c, Risk_Level__c, Category__c, Section__c, Action_Code__c, Responsible_Username__c, Delegate_User__c, Display__c,
-                       (SELECT Id, Change_Log__c, Change_Log__r.Name, Change_Log__r.Change_Request_Id__c, Change_Log__r.Status__c FROM Auditr_Change_Log_Items__r ORDER BY CreatedDate DESC LIMIT 1)
-                FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                  AND Responsible_Username__c = :actor
-                  AND Risk_Level__c IN :allowedRisks
-                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :entryQueryLimit
-            ];
-        }
+        List<Auditr_Entry__c> entries = queryAuditEntrySlice(effectiveStart, effectiveEnd, actor, allowedRisks, continuationOccurredAt, continuationId);
 
         List<AuditEntryDTO> rows = new List<AuditEntryDTO>();
         Integer unassignedInSlice = 0;
@@ -266,12 +255,21 @@ public with sharing class AuditrChangeLogController {
         envelope.entries = rows;
         envelope.queryLimit = entryQueryLimit;
 
-        if (entries.size() < entryQueryLimit) {
+        if (!rows.isEmpty()) {
+            AuditEntryDTO lastRow = rows[rows.size() - 1];
+            envelope.lastOccurredAt = lastRow.occurredAt;
+            envelope.lastEntryId = lastRow.recordId;
+            envelope.hasMore = (rows.size() == entryQueryLimit);
+        } else {
+            envelope.hasMore = false;
+        }
+
+        if (continuationOccurredAt == null && entries.size() < entryQueryLimit) {
             envelope.totalMatchingCount = entries.size();
             envelope.totalUnassignedCount = unassignedInSlice;
             envelope.totalPackagedCount = entries.size() - unassignedInSlice;
             envelope.isCapped = false;
-        } else {
+        } else if (continuationOccurredAt == null) {
             Integer totalMatches = countMatchingEntries(effectiveStart, effectiveEnd, actor, allowedRisks);
             Integer totalUnassigned = countUnassignedEntries(effectiveStart, effectiveEnd, actor, allowedRisks);
             envelope.totalMatchingCount = totalMatches;
@@ -495,72 +493,85 @@ public with sharing class AuditrChangeLogController {
         }
     }
 
-    private static Integer countMatchingEntries(DateTime effectiveStart, DateTime effectiveEnd, String actor, List<String> allowedRisks) {
-        if (actor == null && allowedRisks == null) {
-            return [
-                SELECT COUNT() FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
-            ];
-        } else if (actor != null && allowedRisks == null) {
-            return [
-                SELECT COUNT() FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                  AND Responsible_Username__c = :actor
-                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
-            ];
-        } else if (actor == null && allowedRisks != null) {
-            return [
-                SELECT COUNT() FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                  AND Risk_Level__c IN :allowedRisks
-                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
-            ];
+    private static List<Auditr_Entry__c> queryAuditEntrySlice(
+        DateTime effectiveStart,
+        DateTime effectiveEnd,
+        String actor,
+        List<String> allowedRisks,
+        DateTime continuationOccurredAt,
+        Id continuationId
+    ) {
+        String baseQuery = 'SELECT Id, Name, Occurred_At__c, Risk_Level__c, Category__c, Section__c, Action_Code__c, ' +
+            'Responsible_Username__c, Delegate_User__c, Display__c, ' +
+            '(SELECT Id, Change_Log__c, Change_Log__r.Name, Change_Log__r.Change_Request_Id__c, Change_Log__r.Status__c FROM Auditr_Change_Log_Items__r ORDER BY CreatedDate DESC LIMIT 1) ' +
+            'FROM Auditr_Entry__c WHERE Occurred_At__c >= :effectiveStart ';
+
+        Map<String, Object> binds = new Map<String, Object>{
+            'effectiveStart' => effectiveStart,
+            'effectiveEnd' => effectiveEnd,
+            'entryQueryLimit' => entryQueryLimit
+        };
+
+        if (continuationOccurredAt != null && continuationId != null) {
+            baseQuery += 'AND (Occurred_At__c < :continuationOccurredAt OR (Occurred_At__c = :continuationOccurredAt AND Id < :continuationId)) ';
+            binds.put('continuationOccurredAt', continuationOccurredAt);
+            binds.put('continuationId', continuationId);
         } else {
-            return [
-                SELECT COUNT() FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                  AND Responsible_Username__c = :actor
-                  AND Risk_Level__c IN :allowedRisks
-                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
-            ];
+            baseQuery += 'AND Occurred_At__c <= :effectiveEnd ';
         }
+
+        if (actor != null) {
+            baseQuery += 'AND Responsible_Username__c = :actor ';
+            binds.put('actor', actor);
+        }
+
+        if (allowedRisks != null) {
+            baseQuery += 'AND Risk_Level__c IN :allowedRisks ';
+            binds.put('allowedRisks', allowedRisks);
+        }
+
+        baseQuery += 'ORDER BY Occurred_At__c DESC, Id DESC LIMIT :entryQueryLimit';
+
+        return Database.queryWithBinds(baseQuery, binds, AccessLevel.USER_MODE);
+    }
+
+    private static Integer countMatchingEntries(DateTime effectiveStart, DateTime effectiveEnd, String actor, List<String> allowedRisks) {
+        String query = 'SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd ';
+        Map<String, Object> binds = new Map<String, Object>{
+            'effectiveStart' => effectiveStart,
+            'effectiveEnd' => effectiveEnd,
+            'cap' => BACKLOG_COUNT_CAP
+        };
+        if (actor != null) {
+            query += 'AND Responsible_Username__c = :actor ';
+            binds.put('actor', actor);
+        }
+        if (allowedRisks != null) {
+            query += 'AND Risk_Level__c IN :allowedRisks ';
+            binds.put('allowedRisks', allowedRisks);
+        }
+        query += 'LIMIT :cap';
+        return Database.countQueryWithBinds(query, binds, AccessLevel.USER_MODE);
     }
 
     private static Integer countUnassignedEntries(DateTime effectiveStart, DateTime effectiveEnd, String actor, List<String> allowedRisks) {
-        if (actor == null && allowedRisks == null) {
-            return [
-                SELECT COUNT() FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                  AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
-                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
-            ];
-        } else if (actor != null && allowedRisks == null) {
-            return [
-                SELECT COUNT() FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                  AND Responsible_Username__c = :actor
-                  AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
-                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
-            ];
-        } else if (actor == null && allowedRisks != null) {
-            return [
-                SELECT COUNT() FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                  AND Risk_Level__c IN :allowedRisks
-                  AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
-                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
-            ];
-        } else {
-            return [
-                SELECT COUNT() FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                  AND Responsible_Username__c = :actor
-                  AND Risk_Level__c IN :allowedRisks
-                  AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
-                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
-            ];
+        String query = 'SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd ' +
+            'AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL) ';
+        Map<String, Object> binds = new Map<String, Object>{
+            'effectiveStart' => effectiveStart,
+            'effectiveEnd' => effectiveEnd,
+            'cap' => BACKLOG_COUNT_CAP
+        };
+        if (actor != null) {
+            query += 'AND Responsible_Username__c = :actor ';
+            binds.put('actor', actor);
         }
+        if (allowedRisks != null) {
+            query += 'AND Risk_Level__c IN :allowedRisks ';
+            binds.put('allowedRisks', allowedRisks);
+        }
+        query += 'LIMIT :cap';
+        return Database.countQueryWithBinds(query, binds, AccessLevel.USER_MODE);
     }
 
     private static Set<String> queryRunningJobIds(Set<String> jobIds) {

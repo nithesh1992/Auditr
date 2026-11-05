@@ -1,8 +1,14 @@
 /**
  * @description Re-evaluates Auditr_Entry__c records against active Auditr_Rule__mdt rules and updates Category__c / Risk_Level__c.
  */
-public with sharing class AuditrReclassifyBatch implements Database.Batchable<SObject> {
+public with sharing class AuditrReclassifyBatch implements Database.Batchable<SObject>, Database.Stateful {
     private final Boolean onlyUnclassified;
+
+    public class AuditrReclassifyException extends Exception {}
+
+    @TestVisible private Integer totalUpdated = 0;
+    @TestVisible private Integer totalFailed = 0;
+    @TestVisible private String firstErrorMessage;
 
     /**
      * @description Default constructor that re-evaluates only Unclassified Auditr_Entry__c records.
@@ -66,8 +72,14 @@ public with sharing class AuditrReclassifyBatch implements Database.Batchable<SO
             Database.SaveResult[] saveResults = Database.update(entriesToUpdate, false, AccessLevel.SYSTEM_MODE);
             for (Integer i = 0; i < saveResults.size(); i++) {
                 Database.SaveResult sr = saveResults[i];
-                if (!sr.isSuccess()) {
+                if (sr.isSuccess()) {
+                    totalUpdated++;
+                } else {
+                    totalFailed++;
                     for (Database.Error err : sr.getErrors()) {
+                        if (firstErrorMessage == null) {
+                            firstErrorMessage = err.getMessage();
+                        }
                         System.debug(
                             LoggingLevel.ERROR,
                             'AuditrReclassifyBatch failed to update entry ' + entriesToUpdate[i].Id + ': ' + err.getMessage()
@@ -80,9 +92,15 @@ public with sharing class AuditrReclassifyBatch implements Database.Batchable<SO
 
     /**
      * @description Post-processing hook after reclassification completes.
+     * Throws AuditrReclassifyException if row-level update failures occurred.
      * @param context BatchableContext provided by the platform.
      */
-    @SuppressWarnings('PMD.EmptyStatementBlock')
     public void finish(Database.BatchableContext context) {
+        if (totalFailed > 0) {
+            throw new AuditrReclassifyException(
+                'AuditrReclassifyBatch encountered ' + totalFailed +
+                ' failed record updates. First error: ' + firstErrorMessage
+            );
+        }
     }
 }

@@ -117,4 +117,52 @@ private class AuditrChangeLogTriggerHandlerTest {
             'Error should indicate packaging is in flight'
         );
     }
+
+    @IsTest
+    private static void shouldBlockSeal_WhenPackagingWarningPresentWithoutNotes() {
+        Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
+        List<Auditr_Entry__c> entries = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE ORDER BY Name ASC LIMIT 2];
+        AuditrTestDataFactory.insertChangeLogItems(changeLog.Id, entries);
+
+        changeLog.Description__c = '[PACKAGING WARNING: 1 citation(s) failed to insert. First error: Simulated failure]';
+        changeLog.Status__c = AuditrChangeLogTriggerHandler.STATUS_SEALED;
+
+        Test.startTest();
+        DmlException sealError;
+        try {
+            Database.update(changeLog, AccessLevel.SYSTEM_MODE);
+        } catch (DmlException caught) {
+            sealError = caught;
+        }
+        Test.stopTest();
+
+        Assert.isNotNull(sealError, 'Sealing with packaging warning but without sign-off notes must fail');
+        Assert.isTrue(
+            sealError.getMessage().contains(AuditrChangeLogTriggerHandler.SEAL_PACKAGING_WARNING_REQUIRES_NOTES_ERROR),
+            'Error message should require sign-off notes explaining why warning was accepted'
+        );
+    }
+
+    @IsTest
+    private static void shouldAllowSeal_WhenPackagingWarningPresentWithNotes() {
+        Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
+        List<Auditr_Entry__c> entries = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE ORDER BY Name ASC LIMIT 2];
+        AuditrTestDataFactory.insertChangeLogItems(changeLog.Id, entries);
+
+        changeLog.Description__c = '[PACKAGING WARNING: 1 citation(s) failed to insert. First error: Simulated failure]';
+        changeLog.Sign_Off_Notes__c = 'Auditor reviewed and verified remaining 2 entries suffice for change authorization.';
+        changeLog.Status__c = AuditrChangeLogTriggerHandler.STATUS_SEALED;
+
+        Test.startTest();
+        Database.update(changeLog, AccessLevel.SYSTEM_MODE);
+        Test.stopTest();
+
+        Auditr_Change_Log__c sealed = [
+            SELECT Status__c, Signed_Off_By__c, Sign_Off_Notes__c
+            FROM Auditr_Change_Log__c WHERE Id = :changeLog.Id WITH SYSTEM_MODE
+        ];
+        Assert.areEqual(AuditrChangeLogTriggerHandler.STATUS_SEALED, sealed.Status__c, 'Change log should transition to Sealed');
+        Assert.isNotNull(sealed.Signed_Off_By__c, 'Sign-off user must be recorded');
+        Assert.isNotNull(sealed.Sign_Off_Notes__c, 'Sign-off notes must be preserved');
+    }
 }

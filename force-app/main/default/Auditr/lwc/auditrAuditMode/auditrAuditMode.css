@@ -44,7 +44,7 @@
 /* Row 1: Symmetrically Aligned 3-Column Inputs Grid */
 .filter-inputs-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr 1.25fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1.25rem;
     align-items: start;
 }
@@ -94,18 +94,39 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 2rem;
+    gap: 1rem;
 }
 
-.filter-toggle {
-    display: flex;
+.filter-toggle-pill {
+    display: inline-flex;
     align-items: center;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.375rem;
+    padding: 0.25rem 0.75rem;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+}
+
+.filter-toggle-pill lightning-input {
+    margin: 0;
 }
 
 .filter-actions {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    margin-left: auto;
+}
+
+.load-more-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem 0;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    border-radius: 0 0 0.375rem 0.375rem;
 }
 
 @media (max-width: 1024px) {

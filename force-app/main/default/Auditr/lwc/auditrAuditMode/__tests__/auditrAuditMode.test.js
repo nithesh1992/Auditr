@@ -1,6 +1,7 @@
 import { createElement } from 'lwc';
 import AuditrAuditMode from 'c/auditrAuditMode';
 import getAuditEntries from '@salesforce/apex/AuditrChangeLogController.getAuditEntries';
+import getAuditEntriesWithContinuation from '@salesforce/apex/AuditrChangeLogController.getAuditEntriesWithContinuation';
 import searchDraftChangeLogs from '@salesforce/apex/AuditrChangeLogController.searchDraftChangeLogs';
 import createChangeLog from '@salesforce/apex/AuditrChangeLogController.createChangeLog';
 import packageEntries from '@salesforce/apex/AuditrChangeLogController.packageEntries';
@@ -12,6 +13,12 @@ jest.mock(
         const { createApexTestWireAdapter } = require('@salesforce/sfdx-lwc-jest');
         return { default: createApexTestWireAdapter(jest.fn()) };
     },
+    { virtual: true }
+);
+
+jest.mock(
+    '@salesforce/apex/AuditrChangeLogController.getAuditEntriesWithContinuation',
+    () => ({ default: jest.fn() }),
     { virtual: true }
 );
 
@@ -290,5 +297,54 @@ describe('c-auditr-audit-mode', () => {
             btn.label.startsWith('Package All Unassigned')
         );
         expect(packageAllBtn.label).toContain('(450)');
+    });
+
+    it('loads next slice of events when Load Next 200 Events is clicked', async () => {
+        getAuditEntriesWithContinuation.mockResolvedValue({
+            entries: [ENTRY_TWO],
+            hasMore: false,
+            lastOccurredAt: '2026-10-31T15:01:00.000Z',
+            lastEntryId: ENTRY_TWO.recordId,
+            totalMatchingCount: 2,
+            totalUnassignedCount: 1,
+            totalPackagedCount: 1,
+            isCapped: false,
+            queryLimit: 200
+        });
+
+        const element = createElement('c-auditr-audit-mode', { is: AuditrAuditMode });
+        document.body.appendChild(element);
+        getAuditEntries.emit({
+            entries: [ENTRY_ONE],
+            hasMore: true,
+            lastOccurredAt: '2026-10-31T15:00:00.000Z',
+            lastEntryId: ENTRY_ONE.recordId,
+            totalMatchingCount: 2,
+            totalUnassignedCount: 1,
+            totalPackagedCount: 1,
+            isCapped: false,
+            queryLimit: 200
+        });
+        await flushPromises();
+
+        const loadMoreBtn = element.shadowRoot.querySelector('.load-more-button');
+        expect(loadMoreBtn).not.toBeNull();
+        expect(loadMoreBtn.label).toBe('Load Next 200 Events');
+
+        loadMoreBtn.click();
+        await flushPromises();
+
+        expect(getAuditEntriesWithContinuation).toHaveBeenCalledWith({
+            windowStart: expect.any(String),
+            windowEnd: expect.any(String),
+            actorUsername: '',
+            highRiskOnly: false,
+            continuationOccurredAt: '2026-10-31T15:00:00.000Z',
+            continuationId: ENTRY_ONE.recordId
+        });
+
+        const datatable = element.shadowRoot.querySelector('lightning-datatable');
+        expect(datatable.data.length).toBe(2);
+        expect(element.shadowRoot.querySelector('.load-more-button')).toBeNull();
     });
 });

@@ -4,9 +4,16 @@
  * target log's stored window/actor filter (unassigned entries only), and deduplicates against existing citations.
  * Designed for 10,000+ entry release windows.
  */
-public with sharing class AuditrChangeLogBatch implements Database.Batchable<SObject> {
+public with sharing class AuditrChangeLogBatch implements Database.Batchable<SObject>, Database.Stateful {
     private final Id changeLogId;
     private final Set<Id> selectedEntryIds;
+
+    public class AuditrChangeLogBatchException extends Exception {}
+
+    @TestVisible private Integer totalAttempted = 0;
+    @TestVisible private Integer totalCitationsInserted = 0;
+    @TestVisible private Integer totalFailedCitations = 0;
+    @TestVisible private String firstErrorMessage;
 
     /**
      * @description Filter-driven packaging: scope is resolved from the target log's Window_Start__c, Window_End__c, and Target_Actor__c.
@@ -86,8 +93,15 @@ public with sharing class AuditrChangeLogBatch implements Database.Batchable<SOb
         Database.SaveResult[] saveResults = Database.insert(newItems, false, AccessLevel.SYSTEM_MODE);
         for (Integer i = 0; i < saveResults.size(); i++) {
             Database.SaveResult sr = saveResults[i];
-            if (!sr.isSuccess()) {
+            totalAttempted++;
+            if (sr.isSuccess()) {
+                totalCitationsInserted++;
+            } else {
+                totalFailedCitations++;
                 for (Database.Error err : sr.getErrors()) {
+                    if (firstErrorMessage == null) {
+                        firstErrorMessage = err.getMessage();
+                    }
                     System.debug(
                         LoggingLevel.ERROR,
                         'AuditrChangeLogBatch failed to cite entry ' + newItems[i].Entry__c + ': ' + err.getMessage()
@@ -99,22 +113,42 @@ public with sharing class AuditrChangeLogBatch implements Database.Batchable<SOb
 
     /**
      * @description Clears the in-flight Packaging_Job_Id__c on Draft logs when batch execution completes.
+     * If citations failed to insert, stamps a persistent packaging warning on the change log's Description__c
+     * and throws AuditrChangeLogBatchException so the async job status reflects the failure.
      * @param context BatchableContext provided by the platform.
      */
     public void finish(Database.BatchableContext context) {
         Auditr_Change_Log__c targetLog = queryChangeLog();
         if (targetLog.Status__c == AuditrChangeLogTriggerHandler.STATUS_DRAFT) {
+            String updatedDescription = targetLog.Description__c;
+            if (totalFailedCitations > 0) {
+                String warningHeader = '[PACKAGING WARNING: ' + totalFailedCitations +
+                    ' citation(s) failed to insert. First error: ' + firstErrorMessage + ']';
+                updatedDescription = String.isBlank(updatedDescription)
+                    ? warningHeader
+                    : (warningHeader + '\n\n' + updatedDescription);
+            }
             Database.update(
-                new Auditr_Change_Log__c(Id = changeLogId, Packaging_Job_Id__c = null),
+                new Auditr_Change_Log__c(
+                    Id = changeLogId,
+                    Packaging_Job_Id__c = null,
+                    Description__c = (updatedDescription == null) ? null : updatedDescription.left(32768)
+                ),
                 false,
                 AccessLevel.SYSTEM_MODE
+            );
+        }
+        if (totalFailedCitations > 0) {
+            throw new AuditrChangeLogBatchException(
+                'AuditrChangeLogBatch encountered ' + totalFailedCitations +
+                ' failed citations during packaging. First error: ' + firstErrorMessage
             );
         }
     }
 
     private Auditr_Change_Log__c queryChangeLog() {
         List<Auditr_Change_Log__c> logs = [
-            SELECT Id, Status__c, Target_Actor__c, Window_Start__c, Window_End__c
+            SELECT Id, Status__c, Target_Actor__c, Window_Start__c, Window_End__c, Description__c
             FROM Auditr_Change_Log__c WHERE Id = :changeLogId WITH SYSTEM_MODE LIMIT 1
         ];
         return logs.isEmpty() ? new Auditr_Change_Log__c() : logs[0];

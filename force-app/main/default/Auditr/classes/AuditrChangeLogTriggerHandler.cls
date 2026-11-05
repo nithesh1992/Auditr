@@ -9,6 +9,7 @@ public with sharing class AuditrChangeLogTriggerHandler {
     public static final String SEALED_DELETE_ERROR = 'Sealed Auditr Change Logs cannot be deleted; they are permanent compliance evidence.';
     public static final String SEAL_REQUIRES_ENTRIES_ERROR = 'A change log must contain at least one packaged entry before it can be sealed.';
     public static final String SEAL_PACKAGING_IN_FLIGHT_ERROR = 'Cannot seal an Auditr Change Log while packaging is in flight. Wait for the packaging batch to finish.';
+    public static final String SEAL_PACKAGING_WARNING_REQUIRES_NOTES_ERROR = 'Cannot seal a change log with packaging failures without providing Sign-Off Notes documenting that the discrepancy was reviewed.';
     public static final Set<String> ACTIVE_JOB_STATUSES = new Set<String>{ 'Holding', 'Queued', 'Preparing', 'Processing' };
 
     @TestVisible
@@ -51,6 +52,8 @@ public with sharing class AuditrChangeLogTriggerHandler {
                     changeLog.addError(SEAL_PACKAGING_IN_FLIGHT_ERROR);
                 } else if ((changeLog.Total_Entries__c ?? 0) <= 0) {
                     changeLog.addError(SEAL_REQUIRES_ENTRIES_ERROR);
+                } else if (String.isNotBlank(changeLog.Description__c) && changeLog.Description__c.contains('[PACKAGING WARNING') && String.isBlank(changeLog.Sign_Off_Notes__c)) {
+                    changeLog.addError(SEAL_PACKAGING_WARNING_REQUIRES_NOTES_ERROR);
                 } else {
                     changeLog.Signed_Off_By__c = UserInfo.getUserId();
                     changeLog.Signed_Off_At__c = System.now();
