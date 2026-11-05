@@ -173,9 +173,16 @@
         <!-- Scope and Packaging Action Bar -->
         <div class="results-action-bar">
             <div class="results-stats">
-                <span class="slds-badge slds-theme_shade stats-badge">
-                    {formattedTotalCount} event(s) found
-                </span>
+                <template lwc:if={isPartiallyDisplayed}>
+                    <span class="slds-badge slds-theme_warning stats-badge" title="The selected scope contains more events than can be displayed in the interactive table at once (limited to 200). 'Package All Unassigned' operates on the full unassigned scope.">
+                        Showing first {formattedDisplayedCount} of {formattedTotalCount} events
+                    </span>
+                </template>
+                <template lwc:else>
+                    <span class="slds-badge slds-theme_shade stats-badge">
+                        {formattedTotalCount} event(s) found
+                    </span>
+                </template>
                 <span class="stats-item">
                     <strong>{formattedUnassignedCount}</strong> unassigned
                 </span>

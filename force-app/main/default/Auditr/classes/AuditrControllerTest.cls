@@ -97,4 +97,64 @@ private class AuditrControllerTest {
         Assert.areEqual(3, metrics.unassignedChangeCount, 'Backlog KPI should exclude the 1 entry cited by a change log');
         Assert.isNotNull(watermark, 'Latest synced watermark should be returned for lightweight LWC consumers');
     }
+
+    @IsTest
+    private static void shouldRejectAdminOperations_WhenUserLacksAdminPermission() {
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+            AuditrController.testAdminAccessOverride = false;
+            Test.startTest();
+
+            try {
+                AuditrController.runSyncNow();
+                Assert.fail('runSyncNow should throw AuraHandledException when admin permission is absent');
+            } catch (AuraHandledException auraEx) {
+                Assert.isNotNull(auraEx.getMessage(), 'Exception message should not be null');
+            }
+
+            try {
+                AuditrController.runReclassify(true);
+                Assert.fail('runReclassify should throw AuraHandledException when admin permission is absent');
+            } catch (AuraHandledException auraEx) {
+                Assert.isNotNull(auraEx.getMessage(), 'Exception message should not be null');
+            }
+
+            try {
+                AuditrController.runPurgeNow();
+                Assert.fail('runPurgeNow should throw AuraHandledException when admin permission is absent');
+            } catch (AuraHandledException auraEx) {
+                Assert.isNotNull(auraEx.getMessage(), 'Exception message should not be null');
+            }
+
+            try {
+                AuditrController.scheduleDailySync(2);
+                Assert.fail('scheduleDailySync should throw AuraHandledException when admin permission is absent');
+            } catch (AuraHandledException auraEx) {
+                Assert.isNotNull(auraEx.getMessage(), 'Exception message should not be null');
+            }
+
+            try {
+                AuditrController.unscheduleDailySync();
+                Assert.fail('unscheduleDailySync should throw AuraHandledException when admin permission is absent');
+            } catch (AuraHandledException auraEx) {
+                Assert.isNotNull(auraEx.getMessage(), 'Exception message should not be null');
+            }
+
+            try {
+                AuditrController.scheduleDailyPurge(3);
+                Assert.fail('scheduleDailyPurge should throw AuraHandledException when admin permission is absent');
+            } catch (AuraHandledException auraEx) {
+                Assert.isNotNull(auraEx.getMessage(), 'Exception message should not be null');
+            }
+
+            try {
+                AuditrController.unscheduleDailyPurge();
+                Assert.fail('unscheduleDailyPurge should throw AuraHandledException when admin permission is absent');
+            } catch (AuraHandledException auraEx) {
+                Assert.isNotNull(auraEx.getMessage(), 'Exception message should not be null');
+            }
+
+            Test.stopTest();
+            AuditrController.testAdminAccessOverride = null;
+        }
+    }
 }

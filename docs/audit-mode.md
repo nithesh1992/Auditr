@@ -77,9 +77,11 @@ The top change log table has been replaced with a streamlined, scalable modal:
 
 ---
 
-## Multi-Source Foundation (Phase 2 Schema)
+## Multi-Source Foundation (Reserved Schema)
 
-`Auditr_Entry__c` now ships with three record types — **Setup Audit Trail** (default, used by `AuditrSyncBatch`), **Login History**, and **Data Change** — plus a reserved `Payload__c` long-text column for compact source payloads. No `LoginHistory` or data-change ingestion pipeline ships in this release; the schema compatibility is intentionally laid now so Phase 2 pipelines land without destructive migration.
+::: warning Reserved Schema Foundation
+The `Login History` and `Data Change` record types as well as `Payload__c` on `Auditr_Entry__c` are strictly reserved schema placeholders. Current ingestion pipelines, permission models, retention policies, and unit tests exclusively govern `SetupAuditTrail`. Multi-source ingestion will be introduced in future releases alongside dedicated pipelines and security gates.
+:::
 
 ---
 

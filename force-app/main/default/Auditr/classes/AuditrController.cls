@@ -288,10 +288,19 @@ public with sharing class AuditrController {
         abortScheduledJobsByPrefix(SCHEDULED_PURGE_JOB_NAME);
     }
 
+    public static final String CUSTOM_PERM_ADMIN_ACCESS = 'Auditr_Admin_Access';
+    public static final String ERROR_ADMIN_ACCESS_REQUIRED = 'Auditr Admin access is required for Control Center operations.';
+
+    @TestVisible
+    private static Boolean testAdminAccessOverride;
+
     private static void requireAdminAccess() {
-        if (!Schema.sObjectType.Auditr_Entry__c.isUpdateable()) {
-            AuraHandledException ex = new AuraHandledException('Auditr Admin access is required for Control Center operations.');
-            ex.setMessage('Auditr Admin access is required for Control Center operations.');
+        Boolean hasAccess = (testAdminAccessOverride != null)
+            ? testAdminAccessOverride
+            : FeatureManagement.checkPermission(CUSTOM_PERM_ADMIN_ACCESS);
+        if (!hasAccess) {
+            AuraHandledException ex = new AuraHandledException(ERROR_ADMIN_ACCESS_REQUIRED);
+            ex.setMessage(ERROR_ADMIN_ACCESS_REQUIRED);
             throw ex;
         }
     }

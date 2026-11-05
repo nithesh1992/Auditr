@@ -192,26 +192,31 @@ private class AuditrChangeLogControllerTest {
     @IsTest
     private static void shouldReturnAuditEntries_WithPackagedStateAndRiskFilters() {
         User currentUser = [SELECT Id, Username FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
-        List<AuditrChangeLogController.AuditEntryDTO> allEntries;
-        List<AuditrChangeLogController.AuditEntryDTO> highRiskEntries;
-        List<AuditrChangeLogController.AuditEntryDTO> actorEntries;
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO allEnvelope;
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO highRiskEnvelope;
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO actorEnvelope;
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO actorHighRiskEnvelope;
 
         System.runAs(currentUser) {
             Test.startTest();
-            allEntries = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, false);
-            highRiskEntries = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, true);
-            actorEntries = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', false);
-            List<AuditrChangeLogController.AuditEntryDTO> actorHighRisk = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', true);
+            allEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, false);
+            highRiskEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, true);
+            actorEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', false);
+            actorHighRiskEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', true);
             AuditrChangeLogController.UserLookupDTO blankUser = AuditrChangeLogController.resolveUser(null, '   ');
-            Assert.isFalse(actorHighRisk.isEmpty(), 'Actor with high risk filter should return records');
+            Assert.isFalse(actorHighRiskEnvelope.entries.isEmpty(), 'Actor with high risk filter should return records');
             Assert.isNull(blankUser, 'Blank user lookup should return null');
             Test.stopTest();
         }
 
-        Assert.isFalse(allEntries.isEmpty(), 'Should return audit entries');
+        Assert.isFalse(allEnvelope.entries.isEmpty(), 'Should return audit entries');
+        Assert.isTrue(allEnvelope.totalMatchingCount >= allEnvelope.entries.size(), 'Total count must equal or exceed slice size');
+        Assert.isFalse(allEnvelope.isCapped, 'Test envelope must not be capped');
+        Assert.areEqual(200, allEnvelope.queryLimit, 'Query limit must be 200');
+
         Boolean foundPackaged = false;
         Boolean foundUnassigned = false;
-        for (AuditrChangeLogController.AuditEntryDTO row : allEntries) {
+        for (AuditrChangeLogController.AuditEntryDTO row : allEnvelope.entries) {
             if (row.isPackaged) {
                 foundPackaged = true;
                 Assert.isNotNull(row.changeRequestId, 'Packaged entry must carry change request id');
@@ -221,11 +226,47 @@ private class AuditrChangeLogControllerTest {
         }
         Assert.isTrue(foundPackaged, 'Should detect packaged entry');
         Assert.isTrue(foundUnassigned, 'Should detect unassigned entry');
-        Assert.isFalse(highRiskEntries.isEmpty(), 'Should return high risk entries');
-        for (AuditrChangeLogController.AuditEntryDTO row : highRiskEntries) {
+        Assert.isFalse(highRiskEnvelope.entries.isEmpty(), 'Should return high risk entries');
+        for (AuditrChangeLogController.AuditEntryDTO row : highRiskEnvelope.entries) {
             Assert.isTrue(row.riskLevel == 'Critical' || row.riskLevel == 'High', 'High risk filter must only include Critical or High');
         }
-        Assert.isFalse(actorEntries.isEmpty(), 'Should filter by actor username');
+        Assert.isFalse(actorEnvelope.entries.isEmpty(), 'Should filter by actor username');
+    }
+
+    @IsTest
+    private static void shouldRejectAdminOperations_WhenUserLacksAdminPermission() {
+        User currentUser = [SELECT Id, Username FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
+        Auditr_Change_Log__c draftLog = [SELECT Id FROM Auditr_Change_Log__c WHERE Status__c = 'Draft' LIMIT 1];
+        Auditr_Entry__c testEntry = [SELECT Id FROM Auditr_Entry__c LIMIT 1];
+
+        System.runAs(currentUser) {
+            AuditrChangeLogController.testAdminAccessOverride = false;
+            Test.startTest();
+
+            try {
+                AuditrChangeLogController.createChangeLog('CR-TEST-FAIL-01', System.now(), 'Unauthorized test');
+                Assert.fail('createChangeLog should have thrown AuraHandledException when admin permission is absent');
+            } catch (AuraHandledException auraEx) {
+                Assert.isNotNull(auraEx.getMessage(), 'Exception message should not be null');
+            }
+
+            try {
+                AuditrChangeLogController.packageEntries(draftLog.Id, new List<Id>{ testEntry.Id });
+                Assert.fail('packageEntries should have thrown AuraHandledException when admin permission is absent');
+            } catch (AuraHandledException auraEx) {
+                Assert.isNotNull(auraEx.getMessage(), 'Exception message should not be null');
+            }
+
+            try {
+                AuditrChangeLogController.packageFilteredEntries(draftLog.Id, System.now().addDays(-7), System.now(), null);
+                Assert.fail('packageFilteredEntries should have thrown AuraHandledException when admin permission is absent');
+            } catch (AuraHandledException auraEx) {
+                Assert.isNotNull(auraEx.getMessage(), 'Exception message should not be null');
+            }
+
+            Test.stopTest();
+            AuditrChangeLogController.testAdminAccessOverride = null;
+        }
     }
 
     @IsTest
@@ -246,5 +287,31 @@ private class AuditrChangeLogControllerTest {
         Assert.isFalse(allDrafts.isEmpty(), 'Search with null should return recent draft change logs');
         Assert.isFalse(matchedDrafts.isEmpty(), 'Search with matching prefix should return matched draft change logs');
         Assert.isTrue(unmatchedDrafts.isEmpty(), 'Search with nonexistent term should return empty list');
+    }
+
+    @IsTest
+    private static void shouldComputeAggregateCounts_WhenSliceMatchesQueryLimit() {
+        User currentUser = [SELECT Id, Username FROM User WHERE Id = :UserInfo.getUserId() LIMIT 1];
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO allEnvelope;
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO actorEnvelope;
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO highRiskEnvelope;
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO actorHighRiskEnvelope;
+
+        System.runAs(currentUser) {
+            AuditrChangeLogController.entryQueryLimit = 2;
+            Test.startTest();
+            allEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, false);
+            actorEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', false);
+            highRiskEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, true);
+            actorHighRiskEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', true);
+            Test.stopTest();
+            AuditrChangeLogController.entryQueryLimit = 200;
+        }
+
+        Assert.areEqual(2, allEnvelope.entries.size(), 'Slice size should match lowered query limit');
+        Assert.isTrue(allEnvelope.totalMatchingCount >= 2, 'Total matching count must be computed via COUNT query');
+        Assert.isNotNull(actorEnvelope.totalMatchingCount, 'Actor matching count must be computed');
+        Assert.isNotNull(highRiskEnvelope.totalMatchingCount, 'High risk matching count must be computed');
+        Assert.isNotNull(actorHighRiskEnvelope.totalMatchingCount, 'Actor high risk matching count must be computed');
     }
 }

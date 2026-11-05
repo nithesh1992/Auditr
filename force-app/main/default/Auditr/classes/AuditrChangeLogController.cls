@@ -4,13 +4,18 @@
  */
 public with sharing class AuditrChangeLogController {
     private static final Integer CHANGE_LOG_LIMIT = 200;
-    private static final Integer ENTRY_QUERY_LIMIT = 200;
+    @TestVisible
+    private static Integer entryQueryLimit = 200;
     private static final Integer BACKLOG_COUNT_CAP = 25000;
     private static final Integer DEFAULT_WINDOW_DAYS = 30;
+    public static final String CUSTOM_PERM_ADMIN_ACCESS = 'Auditr_Admin_Access';
     private static final String ERROR_LOG_NOT_DRAFT = 'Only Draft change logs can accept packaged entries.';
     private static final String ERROR_PACKAGING_IN_FLIGHT = 'A packaging job is already running for this change log. Wait for it to finish.';
     private static final String ERROR_INSUFFICIENT_ACCESS = 'Insufficient permissions to package audit entries.';
     private static final Set<String> ACTIVE_JOB_STATUSES = new Set<String>{ 'Holding', 'Queued', 'Preparing', 'Processing' };
+
+    @TestVisible
+    private static Boolean testAdminAccessOverride;
 
     /** @description Change Log summary row for the Audit Mode workspace. */
     public class ChangeLogDTO {
@@ -50,6 +55,16 @@ public with sharing class AuditrChangeLogController {
         @AuraEnabled public String changeRequestId;
         @AuraEnabled public String changeLogName;
         @AuraEnabled public Id changeLogId;
+    }
+
+    /** @description Envelope containing up to ENTRY_QUERY_LIMIT audit entries and scope totals. */
+    public class AuditEntriesEnvelopeDTO {
+        @AuraEnabled public List<AuditEntryDTO> entries;
+        @AuraEnabled public Integer totalMatchingCount;
+        @AuraEnabled public Integer totalUnassignedCount;
+        @AuraEnabled public Integer totalPackagedCount;
+        @AuraEnabled public Boolean isCapped;
+        @AuraEnabled public Integer queryLimit;
     }
 
     /** @description Unassigned audit entry row eligible for packaging. */
@@ -106,7 +121,7 @@ public with sharing class AuditrChangeLogController {
                 FROM Auditr_Entry__c
                 WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
                     AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
-                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :ENTRY_QUERY_LIMIT
+                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :entryQueryLimit
             ];
         } else {
             entries = [
@@ -115,7 +130,7 @@ public with sharing class AuditrChangeLogController {
                 WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
                     AND Responsible_Username__c = :actor
                     AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
-                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :ENTRY_QUERY_LIMIT
+                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :entryQueryLimit
             ];
         }
 
@@ -165,15 +180,15 @@ public with sharing class AuditrChangeLogController {
     }
 
     /**
-     * @description Returns all audit entries matching the window, actor, and risk criteria, with packaging citations.
+     * @description Returns all audit entries matching the window, actor, and risk criteria, with packaging citations and scope totals.
      * @param windowStart Inclusive Occurred_At__c lower bound (defaults to System.now() - 30 days).
      * @param windowEnd Inclusive Occurred_At__c upper bound (defaults to System.now()).
      * @param actorUsername Optional exact Responsible_Username__c filter.
      * @param highRiskOnly When true, filters to Critical and High risk entries only.
-     * @return Up to 200 AuditEntryDTO rows newest-first.
+     * @return AuditEntriesEnvelopeDTO containing up to 200 AuditEntryDTO rows newest-first and aggregate counts.
      */
     @AuraEnabled(cacheable=true)
-    public static List<AuditEntryDTO> getAuditEntries(DateTime windowStart, DateTime windowEnd, String actorUsername, Boolean highRiskOnly) {
+    public static AuditEntriesEnvelopeDTO getAuditEntries(DateTime windowStart, DateTime windowEnd, String actorUsername, Boolean highRiskOnly) {
         DateTime effectiveStart = resolveWindowStart(windowStart);
         DateTime effectiveEnd = resolveWindowEnd(windowEnd);
         String actor = normalizeActor(actorUsername);
@@ -186,7 +201,7 @@ public with sharing class AuditrChangeLogController {
                        (SELECT Id, Change_Log__c, Change_Log__r.Name, Change_Log__r.Change_Request_Id__c, Change_Log__r.Status__c FROM Auditr_Change_Log_Items__r ORDER BY CreatedDate DESC LIMIT 1)
                 FROM Auditr_Entry__c
                 WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
-                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :ENTRY_QUERY_LIMIT
+                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :entryQueryLimit
             ];
         } else if (actor != null && allowedRisks == null) {
             entries = [
@@ -195,7 +210,7 @@ public with sharing class AuditrChangeLogController {
                 FROM Auditr_Entry__c
                 WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
                   AND Responsible_Username__c = :actor
-                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :ENTRY_QUERY_LIMIT
+                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :entryQueryLimit
             ];
         } else if (actor == null && allowedRisks != null) {
             entries = [
@@ -204,7 +219,7 @@ public with sharing class AuditrChangeLogController {
                 FROM Auditr_Entry__c
                 WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
                   AND Risk_Level__c IN :allowedRisks
-                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :ENTRY_QUERY_LIMIT
+                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :entryQueryLimit
             ];
         } else {
             entries = [
@@ -214,11 +229,12 @@ public with sharing class AuditrChangeLogController {
                 WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
                   AND Responsible_Username__c = :actor
                   AND Risk_Level__c IN :allowedRisks
-                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :ENTRY_QUERY_LIMIT
+                WITH USER_MODE ORDER BY Occurred_At__c DESC LIMIT :entryQueryLimit
             ];
         }
 
         List<AuditEntryDTO> rows = new List<AuditEntryDTO>();
+        Integer unassignedInSlice = 0;
         for (Auditr_Entry__c entry : entries) {
             AuditEntryDTO dto = new AuditEntryDTO();
             dto.recordId = entry.Id;
@@ -241,10 +257,30 @@ public with sharing class AuditrChangeLogController {
                 dto.changeLogId = null;
                 dto.changeLogName = null;
                 dto.changeRequestId = null;
+                unassignedInSlice++;
             }
             rows.add(dto);
         }
-        return rows;
+
+        AuditEntriesEnvelopeDTO envelope = new AuditEntriesEnvelopeDTO();
+        envelope.entries = rows;
+        envelope.queryLimit = entryQueryLimit;
+
+        if (entries.size() < entryQueryLimit) {
+            envelope.totalMatchingCount = entries.size();
+            envelope.totalUnassignedCount = unassignedInSlice;
+            envelope.totalPackagedCount = entries.size() - unassignedInSlice;
+            envelope.isCapped = false;
+        } else {
+            Integer totalMatches = countMatchingEntries(effectiveStart, effectiveEnd, actor, allowedRisks);
+            Integer totalUnassigned = countUnassignedEntries(effectiveStart, effectiveEnd, actor, allowedRisks);
+            envelope.totalMatchingCount = totalMatches;
+            envelope.totalUnassignedCount = totalUnassigned;
+            envelope.totalPackagedCount = Math.max(0, totalMatches - totalUnassigned);
+            envelope.isCapped = (totalMatches >= BACKLOG_COUNT_CAP);
+        }
+
+        return envelope;
     }
 
     /**
@@ -312,6 +348,7 @@ public with sharing class AuditrChangeLogController {
      */
     @AuraEnabled
     public static Id createChangeLog(String changeRequestId, DateTime deploymentDate, String description) {
+        requireAdminAccess();
         if (String.isBlank(changeRequestId)) {
             throw createAuraException('Change Request Id is required.');
         }
@@ -425,6 +462,7 @@ public with sharing class AuditrChangeLogController {
     }
 
     private static Auditr_Change_Log__c validatePackagingTarget(Id changeLogId) {
+        requireAdminAccess();
         if (!Schema.sObjectType.Auditr_Change_Log__c.isUpdateable() || !Schema.sObjectType.Auditr_Change_Log_Item__c.isCreateable()) {
             throw createAuraException(ERROR_INSUFFICIENT_ACCESS);
         }
@@ -446,6 +484,83 @@ public with sharing class AuditrChangeLogController {
             throw createAuraException(ERROR_PACKAGING_IN_FLIGHT);
         }
         return targetLog;
+    }
+
+    private static void requireAdminAccess() {
+        Boolean hasAccess = (testAdminAccessOverride != null)
+            ? testAdminAccessOverride
+            : FeatureManagement.checkPermission(CUSTOM_PERM_ADMIN_ACCESS);
+        if (!hasAccess) {
+            throw createAuraException(ERROR_INSUFFICIENT_ACCESS);
+        }
+    }
+
+    private static Integer countMatchingEntries(DateTime effectiveStart, DateTime effectiveEnd, String actor, List<String> allowedRisks) {
+        if (actor == null && allowedRisks == null) {
+            return [
+                SELECT COUNT() FROM Auditr_Entry__c
+                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
+                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
+            ];
+        } else if (actor != null && allowedRisks == null) {
+            return [
+                SELECT COUNT() FROM Auditr_Entry__c
+                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
+                  AND Responsible_Username__c = :actor
+                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
+            ];
+        } else if (actor == null && allowedRisks != null) {
+            return [
+                SELECT COUNT() FROM Auditr_Entry__c
+                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
+                  AND Risk_Level__c IN :allowedRisks
+                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
+            ];
+        } else {
+            return [
+                SELECT COUNT() FROM Auditr_Entry__c
+                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
+                  AND Responsible_Username__c = :actor
+                  AND Risk_Level__c IN :allowedRisks
+                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
+            ];
+        }
+    }
+
+    private static Integer countUnassignedEntries(DateTime effectiveStart, DateTime effectiveEnd, String actor, List<String> allowedRisks) {
+        if (actor == null && allowedRisks == null) {
+            return [
+                SELECT COUNT() FROM Auditr_Entry__c
+                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
+                  AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
+                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
+            ];
+        } else if (actor != null && allowedRisks == null) {
+            return [
+                SELECT COUNT() FROM Auditr_Entry__c
+                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
+                  AND Responsible_Username__c = :actor
+                  AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
+                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
+            ];
+        } else if (actor == null && allowedRisks != null) {
+            return [
+                SELECT COUNT() FROM Auditr_Entry__c
+                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
+                  AND Risk_Level__c IN :allowedRisks
+                  AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
+                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
+            ];
+        } else {
+            return [
+                SELECT COUNT() FROM Auditr_Entry__c
+                WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd
+                  AND Responsible_Username__c = :actor
+                  AND Risk_Level__c IN :allowedRisks
+                  AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
+                WITH USER_MODE LIMIT :BACKLOG_COUNT_CAP
+            ];
+        }
     }
 
     private static Set<String> queryRunningJobIds(Set<String> jobIds) {

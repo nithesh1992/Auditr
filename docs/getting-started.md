@@ -48,7 +48,7 @@ sf org assign permset --name Auditr_Viewer --target-org <org-alias>
 4. In the green **Daily Sync Hour (Org Time Zone)** card, select your preferred hour (default `02:00`) and click **Schedule Daily Sync**.
 
 ::: tip Safe Incremental Watermark
-You can click **Sync Now** as often as you want. `AuditrSyncBatch` queries `SetupAuditTrail` from the latest `Occurred_At__c` watermark (minus a 1-hour overlap buffer) and upserts using `Source_Record_Id__c` as an external ID, guaranteeing zero duplicate `Auditr_Entry__c` rows.
+You can click **Sync Now** as often as you want. `AuditrSyncBatch` queries `SetupAuditTrail` from the latest `Occurred_At__c` watermark (minus a 2-day overlap buffer) and deduplicates against `Source_Record_Id__c` before insertion (`Database.insert(..., false)`), inspecting row-level `SaveResult` records to guarantee zero duplicate `Auditr_Entry__c` rows and record accurate outcomes.
 :::
 
 ## 4. Explore Auditr Home & Reports

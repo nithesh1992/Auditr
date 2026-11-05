@@ -1,7 +1,7 @@
 {
   "name": "auditr",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Long-term, classified Salesforce Setup Audit Trail intelligence and security monitoring framework.",
   "license": "MIT",
   "homepage": "https://nithesh1992.github.io/Auditr/",

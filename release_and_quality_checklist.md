@@ -12,6 +12,7 @@ This persistent checklist documents the end-to-end standard operating procedure 
 | **v1.0.0-2** | Nov 2026 | `Auditr@1.0.0-2` | `04tg7000000cltxAAA` | Security and tightness uplift: admin CRUD authorization on controllers, platform event removal, empApi removal, background batch progress notification, resilient active AsyncApexJob detection, 100% batch coverage. |
 | **v1.1.0-1** | Nov 2026 | `Auditr@1.1.0-1` | `04tg7000000coevAAA` | Major UI/UX redesign: unified Audit Mode (consolidating Incident Mode into dual time modes: Window vs Incident), lightning-record-picker user lookup, cascading burst selection with lightning-tree-grid, scalable modal-first change packaging, conditional purge schedule display. |
 | **v1.1.1-1** | Nov 2026 | `Auditr@1.1.1-1` | `04tg7000000coobAAA` | Filter layout alignment fix: symmetric 3-tier compound field alignment (legend, sub-label, input box) across datetime and record picker; clean inline toggles and centered action toolbar. |
+| **v1.2.0-1** | Nov 2026 | `Auditr@1.2.0-1` | `Pending Packaging` | Architecture & security hardening: dedicated `Auditr_Admin_Access` Custom Permission, in-flight packaging seal concurrency guard, SaveResult partial DML inspection & accurate counts, deterministic in-memory SetupAuditTrail test mocks, bounded table view envelope with scope aggregates & warning badges, GitHub Actions CI quality gates, and documentation reconciliation. |
 
 ---
 

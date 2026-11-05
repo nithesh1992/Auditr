@@ -268,4 +268,27 @@ describe('c-auditr-audit-mode', () => {
             entryIds: [ENTRY_ONE.recordId]
         });
     });
+
+    it('handles envelope response and displays warning badge when scope exceeds table limit', async () => {
+        const element = createElement('c-auditr-audit-mode', { is: AuditrAuditMode });
+        document.body.appendChild(element);
+        getAuditEntries.emit({
+            entries: [ENTRY_ONE],
+            totalMatchingCount: 500,
+            totalUnassignedCount: 450,
+            totalPackagedCount: 50,
+            isCapped: false,
+            queryLimit: 200
+        });
+        await flushPromises();
+
+        const warningBadge = element.shadowRoot.querySelector('.slds-theme_warning');
+        expect(warningBadge).not.toBeNull();
+        expect(warningBadge.textContent).toContain('Showing first 1 of 500 events');
+
+        const packageAllBtn = [...element.shadowRoot.querySelectorAll('lightning-button')].find((btn) =>
+            btn.label.startsWith('Package All Unassigned')
+        );
+        expect(packageAllBtn.label).toContain('(450)');
+    });
 });

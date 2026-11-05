@@ -117,6 +117,13 @@ export default class AuditrAuditMode extends LightningElement {
     errorMessage = '';
     wiredEntriesResult;
 
+    // Scope totals & bounding
+    scopeTotalCount = 0;
+    scopeUnassignedCount = 0;
+    scopePackagedCount = 0;
+    isScopeCapped = false;
+    queryLimit = 200;
+
     // Modal state
     isPackageModalOpen = false;
     packageScope = 'selected'; // 'selected' or 'all'
@@ -155,13 +162,27 @@ export default class AuditrAuditMode extends LightningElement {
         const { data, error } = result;
         this.isLoading = false;
         if (data) {
-            this.entryRows = data.map((row) => ({
+            const rawEntries = Array.isArray(data) ? data : (data.entries || []);
+            this.entryRows = rawEntries.map((row) => ({
                 ...row,
                 displayName: row.name,
                 recordUrl: `/${row.recordId}`,
                 changeRequestUrl: row.changeLogId ? `/${row.changeLogId}` : null,
                 changeRequestDisplay: row.isPackaged ? (row.changeRequestId || row.changeLogName || 'Packaged') : 'Unassigned'
             }));
+            if (Array.isArray(data)) {
+                this.scopeTotalCount = this.entryRows.length;
+                this.scopeUnassignedCount = this.entryRows.filter((e) => !e.isPackaged).length;
+                this.scopePackagedCount = this.entryRows.filter((e) => e.isPackaged).length;
+                this.isScopeCapped = false;
+                this.queryLimit = 200;
+            } else {
+                this.scopeTotalCount = data.totalMatchingCount ?? this.entryRows.length;
+                this.scopeUnassignedCount = data.totalUnassignedCount ?? this.entryRows.filter((e) => !e.isPackaged).length;
+                this.scopePackagedCount = data.totalPackagedCount ?? this.entryRows.filter((e) => e.isPackaged).length;
+                this.isScopeCapped = data.isCapped ?? false;
+                this.queryLimit = data.queryLimit ?? 200;
+            }
             this.errorMessage = '';
             this.syncGridSelectedRows();
         } else if (error) {
@@ -190,27 +211,42 @@ export default class AuditrAuditMode extends LightningElement {
     }
 
     get totalEventsCount() {
-        return this.entryRows.length;
+        return this.scopeTotalCount ?? this.entryRows.length;
     }
 
     get unassignedCount() {
-        return this.entryRows.filter((e) => !e.isPackaged).length;
+        return this.scopeUnassignedCount ?? this.entryRows.filter((e) => !e.isPackaged).length;
     }
 
     get packagedCount() {
-        return this.entryRows.filter((e) => e.isPackaged).length;
+        return this.scopePackagedCount ?? this.entryRows.filter((e) => e.isPackaged).length;
+    }
+
+    get displayedCount() {
+        return this.entryRows.length;
+    }
+
+    get isPartiallyDisplayed() {
+        return this.displayedCount < this.totalEventsCount;
+    }
+
+    get formattedDisplayedCount() {
+        return new Intl.NumberFormat().format(this.displayedCount);
     }
 
     get formattedTotalCount() {
-        return new Intl.NumberFormat().format(this.totalEventsCount);
+        const formatted = new Intl.NumberFormat().format(this.totalEventsCount);
+        return this.isScopeCapped ? `${formatted}+` : formatted;
     }
 
     get formattedUnassignedCount() {
-        return new Intl.NumberFormat().format(this.unassignedCount);
+        const formatted = new Intl.NumberFormat().format(this.unassignedCount);
+        return this.isScopeCapped ? `${formatted}+` : formatted;
     }
 
     get formattedPackagedCount() {
-        return new Intl.NumberFormat().format(this.packagedCount);
+        const formatted = new Intl.NumberFormat().format(this.packagedCount);
+        return this.isScopeCapped ? `${formatted}+` : formatted;
     }
 
     get packageSelectedLabel() {

@@ -32,6 +32,10 @@
         <apexClass>AuditrUtil</apexClass>
         <enabled>true</enabled>
     </classAccesses>
+    <customPermissions>
+        <enabled>true</enabled>
+        <name>Auditr_Admin_Access</name>
+    </customPermissions>
     <description>Grants administrative access to Auditr Control Center operations, SetupAuditTrail ingestion, Audit Mode change packaging, and read-all access to immutable Auditr Entry records.</description>
     <fieldPermissions>
         <editable>false</editable>
