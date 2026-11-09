@@ -71,6 +71,7 @@ Below the summary cards, a two-column schedule grid separates ingestion from ret
 - **Top Unclassified Setup Actions (Last 30 Days • Top 10)**: Groups unclassified entries by `Action_Code__c` and `Section__c` so you can immediately see which new Salesforce Setup actions need a custom `Auditr_Rule__mdt` record.
 - **Recent Batch Jobs (Last 10 Runs)**: Live `AsyncApexJob` monitor across `AuditrSyncBatch`, `AuditrReclassifyBatch`, `AuditrPurgeBatch`, and `AuditrChangeLogBatch`.
 - **Active Classification Rules**: Searchable table of all active `Auditr_Rule__mdt` rules ordered by `Priority__c`.
+- **Watched Objects (Field History) Readiness**: Inspects every `Auditr_Watched_Object__mdt` record against `Schema` describe and `FieldDefinition.IsFieldHistoryTracked` to verify that the target object exists, Field History Tracking is enabled, and every configured watched field is actively tracked (`Ready` vs `Action Needed`).
 
 ---
 
@@ -79,5 +80,6 @@ Below the summary cards, a two-column schedule grid separates ingestion from ret
 Standard Salesforce record pages display inline-edit pencil icons on fields the user has object-level edit access to. To enforce audit integrity in the UI while still supporting administrative reclassification:
 
 - `auditrRecordDetail` replaces the standard record detail component on `Auditr_Entry_Record_Page`.
-- Every provenance field (**Occurred At**, **Action Code**, **Setup Section**, **Responsible Username**, **Actor Username**, **Delegate User**, **Actor Context**, **Source Record ID**, **Display**) is rendered strictly read-only with zero inline-edit pencils.
+- Every provenance field (**Occurred At**, **Action Code**, **Setup Section**, **Responsible Username**, **Actor Username**, **Delegate User**, **Actor Context**, **Source Record ID**, **Display**, **Watched Object**, **Target Record ID**, and **Changed Fields**) is rendered strictly read-only with zero inline-edit pencils.
+- **Conditional Inferred Login-As Warning Banner**: When a Watched Object (`Source__c = 'DataChange'`) entry has a `Delegate_User__c` inferred from a `SetupAuditTrail` Login-As session window (`suOrgAdminLogin` / `suOrgAdminLogout`), `auditrRecordDetail` displays an `INFERRED` badge next to **Delegate User** and renders a prominent warning banner explaining that although the delegated user was inferred from Setup Audit Trail correlation, standard Salesforce Field History does not record session IDs so concurrent edits by the original user remain possible.
 - Clicking **Reclassify** in the component header opens a controlled modal that updates only `Category__c` and `Risk_Level__c` through `AuditrEntryTriggerHandler`'s authorized reclassification pathway, while **Field History Tracking** logs the before/after values on the **Histories** tab.
