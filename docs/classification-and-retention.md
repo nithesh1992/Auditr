@@ -29,7 +29,8 @@ Every `SetupAuditTrail` record is evaluated against active `Auditr_Rule__mdt` re
 | :--- | :--- | :--- | :--- |
 | **Is Active** | `Is_Active__c` | Checkbox | Enables or disables the rule. |
 | **Priority** | `Priority__c` | Number | Evaluation order (`10` runs before `100`). Put specific action rules at lower numbers and broad section fallbacks at higher numbers. |
-| **Match Target** | `Match_Target__c` | `Action`, `Section`, `NamespacePrefix`, `DelegateUser` | Which `SetupAuditTrail` attribute to inspect. |
+| **Source** | `Source__c` | Text(80) | `SetupAuditTrail` (default when blank), `DataChange` (Watched Objects), or `LoginHistory`. |
+| **Match Target** | `Match_Target__c` | `Action`, `Section`, `NamespacePrefix`, `DelegateUser`, `TargetObject`, `ChangedField` | Which attribute to inspect (`TargetObject` and `ChangedField` apply to Watched Object events). |
 | **Match Operator** | `Match_Operator__c` | `Equals`, `Contains`, `StartsWith`, `NotBlank` | Case-insensitive comparison operator (`NotBlank` ignores `Match_Value__c`). |
 | **Match Value** | `Match_Value__c` | Text(255) | Target string to match against (case-insensitive). |
 | **Category** | `Category__c` | Picklist | `Security & Access`, `Users & Sessions`, `Code & Automation`, `Data & Schema`, `Org Preferences`, `Packages & Integrations`, or `Unclassified`. |

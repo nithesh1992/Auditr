@@ -247,6 +247,29 @@
             </div>
         </div>
 
+        <!-- Full Width: Watched Objects Readiness -->
+        <div class="cc-card">
+            <div class="card-header">
+                <div class="header-title">
+                    <lightning-icon icon-name="standard:entity" size="small" alternative-text="Watched Objects"></lightning-icon>
+                    <h2 class="title-text">{watchedObjectsCardTitle}</h2>
+                </div>
+            </div>
+            <template lwc:if={hasWatchedObjects}>
+                <lightning-datatable
+                    key-field="developerName"
+                    data={watchedObjectRows}
+                    columns={watchedObjectColumns}
+                    hide-checkbox-column
+                ></lightning-datatable>
+            </template>
+            <template lwc:else>
+                <p class="slds-text-body_small slds-text-color_weak">
+                    No Watched Objects configured yet. Add records in Setup &rarr; Custom Metadata Types &rarr; Auditr Watched Object.
+                </p>
+            </template>
+        </div>
+
         <!-- Full Width: Active Classification Rules Inspector -->
         <div class="cc-card">
             <div class="card-header">

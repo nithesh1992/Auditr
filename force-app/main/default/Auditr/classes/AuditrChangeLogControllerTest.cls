@@ -199,10 +199,10 @@ private class AuditrChangeLogControllerTest {
 
         System.runAs(currentUser) {
             Test.startTest();
-            allEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, false);
-            highRiskEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, true);
-            actorEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', false);
-            actorHighRiskEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', true);
+            allEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, false, null);
+            highRiskEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, true, 'ALL');
+            actorEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', false, 'SetupAuditTrail');
+            actorHighRiskEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', true, null);
             AuditrChangeLogController.UserLookupDTO blankUser = AuditrChangeLogController.resolveUser(null, '   ');
             Assert.isFalse(actorHighRiskEnvelope.entries.isEmpty(), 'Actor with high risk filter should return records');
             Assert.isNull(blankUser, 'Blank user lookup should return null');
@@ -300,10 +300,10 @@ private class AuditrChangeLogControllerTest {
         System.runAs(currentUser) {
             AuditrChangeLogController.entryQueryLimit = 2;
             Test.startTest();
-            allEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, false);
-            actorEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', false);
-            highRiskEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, true);
-            actorHighRiskEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', true);
+            allEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, false, null);
+            actorEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', false, 'SetupAuditTrail');
+            highRiskEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, true, null);
+            actorHighRiskEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), 'delegate.admin.0@example.com', true, 'DataChange');
             Test.stopTest();
             AuditrChangeLogController.entryQueryLimit = 200;
         }
@@ -324,14 +324,15 @@ private class AuditrChangeLogControllerTest {
         System.runAs(currentUser) {
             AuditrChangeLogController.entryQueryLimit = 2;
             Test.startTest();
-            firstEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, false);
+            firstEnvelope = AuditrChangeLogController.getAuditEntries(System.now().addDays(-7), System.now().addDays(1), null, false, null);
             nextEnvelope = AuditrChangeLogController.getAuditEntriesWithContinuation(
                 System.now().addDays(-7),
                 System.now().addDays(1),
                 null,
                 false,
                 firstEnvelope.lastOccurredAt,
-                firstEnvelope.lastEntryId
+                firstEnvelope.lastEntryId,
+                null
             );
             Test.stopTest();
             AuditrChangeLogController.entryQueryLimit = 200;

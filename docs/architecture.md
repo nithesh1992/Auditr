@@ -1,6 +1,6 @@
 # Architecture, Data Model & Considerations
 
-Auditr is intentionally compact — 10 production Apex classes, 3 triggers, 4 Lightning Web Components, 3 custom objects, 1 custom permission, and 2 custom metadata types — so your security and engineering teams can audit the entire codebase in minutes.
+Auditr is intentionally compact — 13 production Apex classes, 3 triggers, 4 Lightning Web Components, 3 custom objects, 1 custom permission, and 4 custom metadata types — so your security and engineering teams can audit the entire codebase in minutes.
 
 ---
 
@@ -9,18 +9,20 @@ Auditr is intentionally compact — 10 production Apex classes, 3 triggers, 4 Li
 ```text
 force-app/main/default/Auditr/
 ├── applications/        Auditr Lightning App (branded with Auditr_Logo)
-├── classes/             AuditrUtil · AuditrEntryTriggerHandler · AuditrSyncBatch
+├── classes/             AuditrSource · AuditrSetupAuditTrailSource · AuditrWatchedObjectSource
+│                        AuditrUtil · AuditrEntryTriggerHandler · AuditrSyncBatch
 │                        AuditrReclassifyBatch · AuditrPurgeBatch · AuditrController
 │                        AuditrChangeLogController · AuditrChangeLogBatch
 │                        AuditrChangeLogTriggerHandler · AuditrChangeLogItemTriggerHandler
-│                        + 9 test classes (AuditrTestDataFactory, etc.)
+│                        + 8 test classes (AuditrSourceTest, AuditrTestDataFactory, etc.)
 ├── triggers/            AuditrEntryTrigger · AuditrChangeLogTrigger · AuditrChangeLogItemTrigger
 ├── lwc/                 auditrAtAGlance · auditrAuditMode
 │                        auditrControlCenter · auditrRecordDetail
 ├── objects/             Auditr_Entry__c · Auditr_Change_Log__c · Auditr_Change_Log_Item__c
+│                        Auditr_Source__mdt · Auditr_Watched_Object__mdt
 │                        Auditr_Rule__mdt · Auditr_Setting__mdt
 ├── layouts/             Auditr_Entry__c · Auditr_Change_Log__c · Rule/Setting layouts
-├── customMetadata/      36 classification rules + Default setting
+├── customMetadata/      36 classification rules + Setup_Audit_Trail source + Account_Example watched object + Default setting
 ├── customPermissions/   Auditr_Admin_Access
 ├── flexipages/          Auditr_Home · Auditr_Audit_Mode
 │                        Auditr_Control_Center · Auditr_Entry_Record_Page
@@ -83,12 +85,14 @@ flowchart LR
 | **Actor Context** | `Actor_Context__c` | Text(80) | `SetupAuditTrail.CreatedByContext` value. |
 | **Namespace Prefix** | `Namespace_Prefix__c` | Text(80) | `SetupAuditTrail.ResponsibleNamespacePrefix` value. |
 | **Display** | `Display__c` | Long Text Area(32768) | Full human-readable description of the setup change. |
-| **Payload** | `Payload__c` | Long Text Area(32768) | Reserved compact JSON payload for Phase 2 high-velocity sources (unused for SetupAuditTrail). |
-| **Source** | `Source__c` | Picklist | Audit source (`SetupAuditTrail`; `LoginHistory` and `DataChange` reserved for Phase 2). |
-| **Source Record ID** | `Source_Record_Id__c` | Text(64) (External ID, Unique) | 18-character `SetupAuditTrail.Id` used for chunk deduplication. |
+| **Payload** | `Payload__c` | Long Text Area(32768) | Compact JSON metadata payload (for Watched Objects: `object`, `recordId`, `fieldCount`, `fields`, `firstHistoryId` — never field values). |
+| **Source** | `Source__c` | Picklist | Audit source (`SetupAuditTrail`, `DataChange` for Watched Objects, and `LoginHistory` reserved for optional Login History adapters). |
+| **Source Record ID** | `Source_Record_Id__c` | Text(18) (External ID, Unique) | 18-character source record ID (`SetupAuditTrail.Id` or first `<Object>History.Id` in a save run) used for chunk deduplication. |
+| **Target Object** | `Target_Object__c` | Text(80) | SObject API name for Watched Object events (for example `Account` or `Opportunity`). |
+| **Target Record ID** | `Target_Record_Id__c` | Text(18) | 18-character Salesforce record ID of the modified watched record. |
 
-::: warning Reserved Schema Foundation
-The `Login History` and `Data Change` record types as well as the `Payload__c` long text field on `Auditr_Entry__c` are strictly reserved schema placeholders. Current ingestion pipelines, permission models, retention policies, and unit tests exclusively govern `SetupAuditTrail`. Multi-source ingestion will be introduced in future releases alongside dedicated pipelines and security gates.
+::: info Pluggable Sources & Watched Objects Privacy by Design
+`AuditrWatchedObjectSource` queries only `Id`, `ParentId`/`<Object>Id`, `Field`, `CreatedById`, and `CreatedDate` from standard Salesforce `<Object>History` / `<Custom>__History` tables — **`OldValue` and `NewValue` are never queried or stored**, preventing the audit log from becoming a secondary leak path for confidential data. Consecutive field changes in the same save transaction (same record, same user, exact same timestamp, with no intervening row) are grouped into a single `Auditr_Entry__c` record. Note that Salesforce Field History timestamps have 1-second precision, tracks up to 20 fields per object without Shield, and does not capture record reads/exports.
 :::
 
 ---

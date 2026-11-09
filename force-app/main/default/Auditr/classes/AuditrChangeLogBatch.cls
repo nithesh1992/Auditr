@@ -39,9 +39,12 @@ public with sharing class AuditrChangeLogBatch implements Database.Batchable<SOb
      * @return Database.QueryLocator over Auditr_Entry__c ordered chronologically.
      */
     public Database.QueryLocator start(Database.BatchableContext context) {
+        String setupSource = AuditrUtil.DEFAULT_SOURCE;
         if (selectedEntryIds != null && !selectedEntryIds.isEmpty()) {
             return Database.getQueryLocator([
-                SELECT Id FROM Auditr_Entry__c WHERE Id IN :selectedEntryIds WITH SYSTEM_MODE ORDER BY Occurred_At__c ASC
+                SELECT Id FROM Auditr_Entry__c
+                WHERE Id IN :selectedEntryIds AND Source__c = :setupSource
+                WITH SYSTEM_MODE ORDER BY Occurred_At__c ASC
             ]);
         }
 
@@ -53,6 +56,7 @@ public with sharing class AuditrChangeLogBatch implements Database.Batchable<SOb
             return Database.getQueryLocator([
                 SELECT Id FROM Auditr_Entry__c
                 WHERE Occurred_At__c >= :windowStart AND Occurred_At__c <= :windowEnd
+                    AND Source__c = :setupSource
                     AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
                 WITH SYSTEM_MODE ORDER BY Occurred_At__c ASC
             ]);
@@ -60,6 +64,7 @@ public with sharing class AuditrChangeLogBatch implements Database.Batchable<SOb
         return Database.getQueryLocator([
             SELECT Id FROM Auditr_Entry__c
             WHERE Occurred_At__c >= :windowStart AND Occurred_At__c <= :windowEnd
+                AND Source__c = :setupSource
                 AND Responsible_Username__c = :actor
                 AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
             WITH SYSTEM_MODE ORDER BY Occurred_At__c ASC

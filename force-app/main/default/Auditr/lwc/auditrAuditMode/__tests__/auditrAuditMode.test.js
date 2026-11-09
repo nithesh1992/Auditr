@@ -340,11 +340,39 @@ describe('c-auditr-audit-mode', () => {
             actorUsername: '',
             highRiskOnly: false,
             continuationOccurredAt: '2026-10-31T15:00:00.000Z',
-            continuationId: ENTRY_ONE.recordId
+            continuationId: ENTRY_ONE.recordId,
+            sourceFilter: ''
         });
 
         const datatable = element.shadowRoot.querySelector('lightning-datatable');
         expect(datatable.data.length).toBe(2);
         expect(element.shadowRoot.querySelector('.load-more-button')).toBeNull();
+    });
+
+    it('decorates Watched Object entries with targetRecordUrl and targetRecordLabel', async () => {
+        const element = createElement('c-auditr-audit-mode', { is: AuditrAuditMode });
+        document.body.appendChild(element);
+        getAuditEntries.emit({
+            entries: [
+                {
+                    ...ENTRY_ONE,
+                    source: 'DataChange',
+                    targetObject: 'Account',
+                    targetRecordId: '001000000000001AAA',
+                    isPackaged: false
+                }
+            ],
+            totalMatchingCount: 1,
+            totalUnassignedCount: 0,
+            totalPackagedCount: 0,
+            isCapped: false,
+            queryLimit: 200
+        });
+        await flushPromises();
+
+        const datatable = element.shadowRoot.querySelector('lightning-datatable');
+        expect(datatable.data[0].targetRecordUrl).toBe('/001000000000001AAA');
+        expect(datatable.data[0].targetRecordLabel).toBe('Account (001000000000001AAA)');
+        expect(datatable.data[0].changeRequestDisplay).toBe('Investigation Only');
     });
 });

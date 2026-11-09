@@ -37,7 +37,16 @@
     margin-bottom: 1.25rem;
 }
 
-.time-mode-selector {
+.filter-top-row {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.time-mode-selector,
+.source-filter-selector {
     display: inline-block;
 }
 

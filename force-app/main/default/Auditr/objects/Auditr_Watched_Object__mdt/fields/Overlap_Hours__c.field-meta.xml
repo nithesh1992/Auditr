@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Overlap_Hours__c</fullName>
+    <description>Replay window, in hours, subtracted from the source watermark on each run. Duplicates are skipped by Source Record ID. Blank uses 48.</description>
+    <externalId>false</externalId>
+    <fieldManageability>SubscriberControlled</fieldManageability>
+    <inlineHelpText>Hours of already-ingested history to re-read each run to catch late-arriving rows (blank = 48).</inlineHelpText>
+    <label>Overlap Hours</label>
+    <precision>5</precision>
+    <required>false</required>
+    <scale>0</scale>
+    <type>Number</type>
+    <unique>false</unique>
+</CustomField>

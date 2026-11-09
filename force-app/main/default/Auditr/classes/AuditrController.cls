@@ -68,6 +68,8 @@ public with sharing class AuditrController {
         @AuraEnabled public List<JobSummaryDTO> recentJobs;
         @AuraEnabled public List<RuleSummaryDTO> activeRules;
         @AuraEnabled public List<UnclassifiedActionDTO> topUnclassifiedActions;
+        @AuraEnabled public Integer watchedObjectEntries;
+        @AuraEnabled public List<AuditrWatchedObjectSource.WatchedObjectReadiness> watchedObjects;
     }
 
     /** @description Recent AsyncApexJob execution summary. */
@@ -88,6 +90,7 @@ public with sharing class AuditrController {
         @AuraEnabled public String developerName;
         @AuraEnabled public String label;
         @AuraEnabled public Integer priority;
+        @AuraEnabled public String source;
         @AuraEnabled public String matchTarget;
         @AuraEnabled public String matchOperator;
         @AuraEnabled public String matchValue;
@@ -208,18 +211,22 @@ public with sharing class AuditrController {
         status.recentJobs = queryRecentJobs(status);
         status.activeRules = buildActiveRuleSummaries();
         status.topUnclassifiedActions = queryTopUnclassifiedActions(unclassifiedCutoff, status.unclassifiedEntries);
+        String dataChangeSource = AuditrUtil.DATA_CHANGE_SOURCE;
+        status.watchedObjectEntries = [SELECT COUNT() FROM Auditr_Entry__c WHERE Source__c = :dataChangeSource WITH USER_MODE LIMIT :TOTAL_COUNT_CAP];
+        status.watchedObjects = AuditrWatchedObjectSource.getWatchedObjectReadiness();
         evaluateHealthWarning(status);
         return status;
     }
 
     /**
-     * @description Executes AuditrSyncBatch immediately.
-     * @return AsyncApexJob Id of the queued batch.
+     * @description Executes AuditrSyncBatch immediately across all active sources.
+     * @return First AsyncApexJob Id of the queued batch(es).
      */
     @AuraEnabled
     public static Id runSyncNow() {
         requireAdminAccess();
-        return Database.executeBatch(new AuditrSyncBatch(), AuditrUtil.getBatchSize());
+        List<Id> jobIds = AuditrSyncBatch.dispatchActiveSources();
+        return jobIds.isEmpty() ? Database.executeBatch(new AuditrSyncBatch(), AuditrUtil.getBatchSize()) : jobIds[0];
     }
 
     /**
@@ -242,6 +249,15 @@ public with sharing class AuditrController {
     public static Id runPurgeNow() {
         requireAdminAccess();
         return Database.executeBatch(new AuditrPurgeBatch(), AuditrUtil.getBatchSize());
+    }
+
+    /**
+     * @description Returns readiness descriptors for all configured Auditr_Watched_Object__mdt records.
+     * @return Ordered list of WatchedObjectReadiness statuses.
+     */
+    @AuraEnabled(cacheable=true)
+    public static List<AuditrWatchedObjectSource.WatchedObjectReadiness> getWatchedObjectReadiness() {
+        return AuditrWatchedObjectSource.getWatchedObjectReadiness();
     }
 
     /**
@@ -441,6 +457,7 @@ public with sharing class AuditrController {
             dto.developerName = rule.DeveloperName;
             dto.label = rule.MasterLabel;
             dto.priority = (rule.Priority__c != null) ? Integer.valueOf(rule.Priority__c) : null;
+            dto.source = String.isNotBlank(rule.Source__c) ? rule.Source__c : AuditrUtil.DEFAULT_SOURCE;
             dto.matchTarget = rule.Match_Target__c;
             dto.matchOperator = rule.Match_Operator__c;
             dto.matchValue = rule.Match_Value__c;

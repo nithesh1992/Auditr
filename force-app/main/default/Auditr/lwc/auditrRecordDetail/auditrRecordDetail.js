@@ -13,6 +13,9 @@ import ACTOR_CONTEXT_FIELD from '@salesforce/schema/Auditr_Entry__c.Actor_Contex
 import NAMESPACE_PREFIX_FIELD from '@salesforce/schema/Auditr_Entry__c.Namespace_Prefix__c';
 import SOURCE_FIELD from '@salesforce/schema/Auditr_Entry__c.Source__c';
 import SOURCE_RECORD_ID_FIELD from '@salesforce/schema/Auditr_Entry__c.Source_Record_Id__c';
+import TARGET_OBJECT_FIELD from '@salesforce/schema/Auditr_Entry__c.Target_Object__c';
+import TARGET_RECORD_ID_FIELD from '@salesforce/schema/Auditr_Entry__c.Target_Record_Id__c';
+import PAYLOAD_FIELD from '@salesforce/schema/Auditr_Entry__c.Payload__c';
 
 const FIELDS = [
     SECTION_FIELD,
@@ -25,7 +28,10 @@ const FIELDS = [
     ACTOR_CONTEXT_FIELD,
     NAMESPACE_PREFIX_FIELD,
     SOURCE_FIELD,
-    SOURCE_RECORD_ID_FIELD
+    SOURCE_RECORD_ID_FIELD,
+    TARGET_OBJECT_FIELD,
+    TARGET_RECORD_ID_FIELD,
+    PAYLOAD_FIELD
 ];
 
 export default class AuditrRecordDetail extends LightningElement {
@@ -79,6 +85,44 @@ export default class AuditrRecordDetail extends LightningElement {
 
     get sourceRecordId() {
         return getFieldValue(this.entryRecord?.data, SOURCE_RECORD_ID_FIELD) || '—';
+    }
+
+    get targetObject() {
+        return getFieldValue(this.entryRecord?.data, TARGET_OBJECT_FIELD) || '';
+    }
+
+    get targetRecordId() {
+        return getFieldValue(this.entryRecord?.data, TARGET_RECORD_ID_FIELD) || '';
+    }
+
+    get targetRecordUrl() {
+        return this.targetRecordId ? `/${this.targetRecordId}` : '';
+    }
+
+    get hasWatchedTarget() {
+        return Boolean(this.targetObject || this.targetRecordId);
+    }
+
+    get isInferredWatchedObjectDelegate() {
+        const rawDelegate = getFieldValue(this.entryRecord?.data, DELEGATE_USER_FIELD);
+        return this.source === 'DataChange' && Boolean(rawDelegate && rawDelegate.trim());
+    }
+
+    get changedFields() {
+        const rawPayload = getFieldValue(this.entryRecord?.data, PAYLOAD_FIELD);
+        if (!rawPayload) {
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(rawPayload);
+            return Array.isArray(parsed?.fields) ? parsed.fields : [];
+        } catch {
+            return [];
+        }
+    }
+
+    get hasChangedFields() {
+        return this.changedFields.length > 0;
     }
 
     handleEditClassification() {

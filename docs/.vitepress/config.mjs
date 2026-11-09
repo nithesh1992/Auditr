@@ -30,11 +30,11 @@ export default defineConfig({
       { text: "Rules & Retention", link: "/classification-and-retention" },
       { text: "Architecture", link: "/architecture" },
       {
-        text: "v1.2.1",
+        text: "v1.3.0",
         items: [
           {
-            text: "Install v1.2.1-1 (04tg7000000dLJ7AAM)",
-            link: "https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000dLJ7AAM"
+            text: "Install v1.3.0-1 (04tg7000000e1YTAAY)",
+            link: "https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000e1YTAAY"
           },
           {
             text: "Source Code",

@@ -1,18 +1,22 @@
 /**
- * @description Schedulable and Batchable job that ingests new SetupAuditTrail rows into Auditr_Entry__c
- * using an indexed CreatedDate watermark with a 2-day overlap window and per-chunk deduplication.
+ * @description Schedulable dispatcher and generic Batchable ingestion engine for Auditr sources.
+ * The scheduled entry point enqueues one independent batch per active Auditr_Source__mdt adapter, so a failure
+ * in one source never blocks another. Each batch applies the adapter's watermark and overlap window, removes
+ * duplicates by Source_Record_Id__c, inserts with partial-success DML, and fails the job in finish() when any
+ * row could not be inserted. The class name is kept for compatibility with existing scheduled jobs and
+ * Control Center job monitoring.
  */
 public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>, Database.Stateful, Schedulable {
-    private static final Integer OVERLAP_DAYS = 2;
-
     public class AuditrSyncException extends Exception {}
 
-    /** @description Structured result of an audit trail ingestion slice. */
+    /** @description Structured result of an ingestion slice. */
     public class IngestResult {
         public Integer successCount = 0;
         public Integer failedCount = 0;
         public String firstErrorMessage;
     }
+
+    private final AuditrSource source;
 
     @TestVisible private Integer totalSourceProcessed = 0;
     @TestVisible private Integer totalSuccessfullyInserted = 0;
@@ -20,96 +24,125 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
     @TestVisible private String firstInsertErrorMessage;
 
     /**
-     * @description Schedulable entry point; executes AuditrSyncBatch when Auditr_Setting__mdt.Is_Active__c is true.
+     * @description Default constructor ingesting Setup Audit Trail (backward compatible).
+     */
+    public AuditrSyncBatch() {
+        this(AuditrSource.defaultSource());
+    }
+
+    /**
+     * @description Constructs an ingestion batch for a specific source adapter.
+     * @param source Configured AuditrSource adapter.
+     */
+    public AuditrSyncBatch(AuditrSource source) {
+        this.source = (source != null) ? source : AuditrSource.defaultSource();
+    }
+
+    /**
+     * @description Schedulable entry point; dispatches every active source when Auditr_Setting__mdt.Is_Active__c is true.
      * @param context SchedulableContext provided by the platform.
      */
     public void execute(SchedulableContext context) {
         if (AuditrUtil.getSetting().Is_Active__c == true) {
-            Database.executeBatch(new AuditrSyncBatch(), AuditrUtil.getBatchSize());
+            dispatchActiveSources();
         }
     }
 
     /**
-     * @description Queries SetupAuditTrail starting from the latest ingested watermark minus 2 days.
+     * @description Enqueues one AuditrSyncBatch per active Auditr_Source__mdt adapter.
+     * @return Async job Ids, in registry order.
+     */
+    public static List<Id> dispatchActiveSources() {
+        List<Id> jobIds = new List<Id>();
+        for (AuditrSource adapter : AuditrSource.loadActiveSources()) {
+            jobIds.add(Database.executeBatch(new AuditrSyncBatch(adapter), adapter.batchSize()));
+        }
+        return jobIds;
+    }
+
+    /**
+     * @description Returns the adapter's query from its resolved watermark cutoff.
      * @param context BatchableContext provided by the platform.
-     * @return Database.QueryLocator for SetupAuditTrail ordered by CreatedDate ASC.
+     * @return Database.QueryLocator over the source object.
      */
     public Database.QueryLocator start(Database.BatchableContext context) {
-        DateTime cutoffTimestamp = resolveCutoffTimestamp();
-        return Database.getQueryLocator([
-            SELECT Id, Action, Section, CreatedDate, CreatedById, CreatedBy.Username,
-                   Display, DelegateUser, ResponsibleNamespacePrefix, CreatedByContext
-            FROM SetupAuditTrail
-            WHERE CreatedDate >= :cutoffTimestamp
-            WITH SYSTEM_MODE
-            ORDER BY CreatedDate ASC
-        ]);
+        return source.getQueryLocator(source.resolveCutoff());
     }
 
     /**
-     * @description Deduplicates incoming SetupAuditTrail records and inserts new Auditr_Entry__c rows in SYSTEM_MODE.
+     * @description Maps a chunk through the adapter, then deduplicates and inserts new Auditr_Entry__c rows.
      * @param context BatchableContext provided by the platform.
-     * @param scope Chunk of SetupAuditTrail records.
+     * @param scope Chunk of source rows.
      */
     public void execute(Database.BatchableContext context, List<SObject> scope) {
-        IngestResult result = processAuditRecordsWithResult((List<SetupAuditTrail>) scope);
         totalSourceProcessed += scope.size();
-        totalSuccessfullyInserted += result.successCount;
-        totalFailedInserts += result.failedCount;
-        if (firstInsertErrorMessage == null && result.firstErrorMessage != null) {
-            firstInsertErrorMessage = result.firstErrorMessage;
-        }
+        accumulate(insertNewEntries(source.toEntries(scope), source.sourceKey()));
     }
 
     /**
-     * @description Chains AuditrPurgeBatch when opt-in retention purging is enabled in Auditr_Setting__mdt.
-     * If row-level insert failures occurred during ingestion, throws AuditrSyncException so the job
-     * is durably marked as Failed in AsyncApexJob and surfaces in the Control Center.
+     * @description Inserts entries still held by the adapter, fails the job when any row failed, and chains
+     * AuditrPurgeBatch after a successful Setup Audit Trail run when retention purging is enabled.
      * @param context BatchableContext provided by the platform.
      */
     public void finish(Database.BatchableContext context) {
+        accumulate(insertNewEntries(source.flush(), source.sourceKey()));
         if (totalFailedInserts > 0) {
             throw new AuditrSyncException(
-                'AuditrSyncBatch encountered ' + totalFailedInserts +
+                'AuditrSyncBatch [' + source.sourceKey() + '] encountered ' + totalFailedInserts +
                 ' failed record inserts during ingestion. First error: ' + firstInsertErrorMessage
             );
         }
         Auditr_Setting__mdt setting = AuditrUtil.getSetting();
-        if (!Test.isRunningTest() && setting.Enable_Purge__c == true && setting.Retention_Days__c != null && setting.Retention_Days__c > 0) {
+        if (!Test.isRunningTest() && source.sourceKey() == AuditrUtil.DEFAULT_SOURCE
+            && setting.Enable_Purge__c == true && setting.Retention_Days__c != null && setting.Retention_Days__c > 0) {
             Database.executeBatch(new AuditrPurgeBatch(), AuditrUtil.getBatchSize());
         }
     }
 
     /**
-     * @description Deduplicates and inserts new Auditr_Entry__c records from a list of SetupAuditTrail rows.
-     * Inspects partial-success DML results, logs failures, and returns structured success/failure counts.
-     * @param auditRecords List of SetupAuditTrail records to ingest.
+     * @description Deduplicates and inserts Setup Audit Trail rows (backward-compatible helper).
+     * @param auditRecords SetupAuditTrail rows.
      * @return IngestResult with successCount, failedCount, and firstErrorMessage.
      */
     public static IngestResult processAuditRecordsWithResult(List<SetupAuditTrail> auditRecords) {
+        return insertNewEntries(new AuditrSetupAuditTrailSource().toEntries(auditRecords), AuditrUtil.DEFAULT_SOURCE);
+    }
+
+    /**
+     * @description Backward-compatible helper returning the successfully inserted count.
+     * @param auditRecords SetupAuditTrail rows.
+     * @return Number of new Auditr_Entry__c records inserted.
+     */
+    public static Integer processAuditRecords(List<SetupAuditTrail> auditRecords) {
+        return processAuditRecordsWithResult(auditRecords).successCount;
+    }
+
+    /**
+     * @description Removes entries whose Source_Record_Id__c already exists (in the database or earlier in the list),
+     * inserts the rest with partial-success DML, and records row-level failures.
+     * @param candidates Unsaved entries built by an adapter.
+     * @param sourceKey Source key used in error logging.
+     * @return IngestResult with success/failure counts.
+     */
+    public static IngestResult insertNewEntries(List<Auditr_Entry__c> candidates, String sourceKey) {
         IngestResult result = new IngestResult();
-        if (auditRecords == null || auditRecords.isEmpty()) {
+        if (candidates == null || candidates.isEmpty()) {
             return result;
         }
 
         Set<String> candidateSourceIds = new Set<String>();
-        for (SetupAuditTrail auditRow : auditRecords) {
-            if (auditRow.Id != null) {
-                candidateSourceIds.add(String.valueOf(auditRow.Id));
+        for (Auditr_Entry__c entry : candidates) {
+            if (String.isNotBlank(entry.Source_Record_Id__c)) {
+                candidateSourceIds.add(entry.Source_Record_Id__c);
             }
         }
-
-        Set<String> existingSourceIds = queryExistingSourceIds(candidateSourceIds);
+        Set<String> seenSourceIds = queryExistingSourceIds(candidateSourceIds);
         List<Auditr_Entry__c> newEntries = new List<Auditr_Entry__c>();
-
-        for (SetupAuditTrail auditRow : auditRecords) {
-            String sourceId = String.valueOf(auditRow.Id);
-            if (!existingSourceIds.contains(sourceId)) {
-                newEntries.add(AuditrUtil.buildEntryFromAuditTrail(auditRow));
-                existingSourceIds.add(sourceId);
+        for (Auditr_Entry__c entry : candidates) {
+            if (String.isNotBlank(entry.Source_Record_Id__c) && seenSourceIds.add(entry.Source_Record_Id__c)) {
+                newEntries.add(entry);
             }
         }
-
         if (newEntries.isEmpty()) {
             return result;
         }
@@ -119,58 +152,45 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
             Database.SaveResult sr = saveResults[i];
             if (sr.isSuccess()) {
                 result.successCount++;
-            } else {
-                result.failedCount++;
-                for (Database.Error err : sr.getErrors()) {
-                    if (result.firstErrorMessage == null) {
-                        result.firstErrorMessage = err.getMessage();
-                    }
-                    System.debug(
-                        LoggingLevel.ERROR,
-                        'AuditrSyncBatch failed to insert row for sourceId ' +
-                        newEntries[i].Source_Record_Id__c + ': ' + err.getMessage()
-                    );
+                continue;
+            }
+            result.failedCount++;
+            for (Database.Error err : sr.getErrors()) {
+                if (result.firstErrorMessage == null) {
+                    result.firstErrorMessage = err.getMessage();
                 }
+                System.debug(
+                    LoggingLevel.ERROR,
+                    'AuditrSyncBatch [' + sourceKey + '] failed to insert row for sourceId ' +
+                    newEntries[i].Source_Record_Id__c + ': ' + err.getMessage()
+                );
             }
         }
         return result;
     }
 
     /**
-     * @description Backward-compatible helper returning successfully inserted count.
-     * @param auditRecords List of SetupAuditTrail records to ingest.
-     * @return Number of new Auditr_Entry__c records successfully inserted.
+     * @description Resolves the Setup Audit Trail watermark cutoff (backward-compatible test hook).
+     * @return Cutoff DateTime.
      */
-    public static Integer processAuditRecords(List<SetupAuditTrail> auditRecords) {
-        return processAuditRecordsWithResult(auditRecords).successCount;
-    }
-
     @TestVisible
     private static DateTime resolveCutoffTimestamp() {
-        List<Auditr_Entry__c> latestEntries = [
-            SELECT Occurred_At__c, CreatedDate
-            FROM Auditr_Entry__c
-            WHERE Source__c = :AuditrUtil.DEFAULT_SOURCE
-            WITH SYSTEM_MODE
-            ORDER BY CreatedDate DESC
-            LIMIT 1
-        ];
+        return AuditrSource.defaultSource().resolveCutoff();
+    }
 
-        DateTime twoDaysAgo = System.now().addDays(-OVERLAP_DAYS);
-        if (!latestEntries.isEmpty() && latestEntries[0].Occurred_At__c != null) {
-            DateTime watermarkOverlap = latestEntries[0].Occurred_At__c.addDays(-OVERLAP_DAYS);
-            return (watermarkOverlap < twoDaysAgo) ? watermarkOverlap : twoDaysAgo;
+    private void accumulate(IngestResult result) {
+        totalSuccessfullyInserted += result.successCount;
+        totalFailedInserts += result.failedCount;
+        if (firstInsertErrorMessage == null && result.firstErrorMessage != null) {
+            firstInsertErrorMessage = result.firstErrorMessage;
         }
-
-        Decimal configuredBackfill = AuditrUtil.getSetting().Backfill_Days__c;
-        Integer backfillDays = (configuredBackfill != null && configuredBackfill > 0)
-            ? Integer.valueOf(configuredBackfill)
-            : AuditrUtil.DEFAULT_BACKFILL_DAYS;
-        return System.now().addDays(-backfillDays);
     }
 
     private static Set<String> queryExistingSourceIds(Set<String> candidateSourceIds) {
         Set<String> existingIds = new Set<String>();
+        if (candidateSourceIds.isEmpty()) {
+            return existingIds;
+        }
         for (Auditr_Entry__c existing : [
             SELECT Source_Record_Id__c
             FROM Auditr_Entry__c

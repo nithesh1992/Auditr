@@ -15,6 +15,12 @@ const TIME_MODE_OPTIONS = [
     { label: 'Incident (Time ± Radius)', value: 'incident' }
 ];
 
+const SOURCE_FILTER_OPTIONS = [
+    { label: 'All Sources', value: '' },
+    { label: 'Setup Audit Trail', value: 'SetupAuditTrail' },
+    { label: 'Watched Objects', value: 'DataChange' }
+];
+
 const RADIUS_OPTIONS = [
     { label: '± 15 Minutes', value: '15' },
     { label: '± 30 Minutes', value: '30' },
@@ -46,6 +52,13 @@ const FLAT_COLUMNS = [
     { label: 'Risk', fieldName: 'riskLevel', type: 'text', initialWidth: 90 },
     { label: 'Category', fieldName: 'category', type: 'text', initialWidth: 155 },
     { label: 'Section', fieldName: 'section', type: 'text', initialWidth: 140 },
+    {
+        label: 'Watched Record',
+        fieldName: 'targetRecordUrl',
+        type: 'url',
+        initialWidth: 175,
+        typeAttributes: { label: { fieldName: 'targetRecordLabel' }, target: '_blank' }
+    },
     { label: 'Responsible Actor', fieldName: 'responsibleUsername', type: 'text', initialWidth: 180 },
     { label: 'Delegate', fieldName: 'delegateUser', type: 'text', initialWidth: 120 },
     { label: 'Display Summary', fieldName: 'displayText', type: 'text', wrapText: true },
@@ -83,12 +96,14 @@ const TREE_COLUMNS = [
 
 export default class AuditrAuditMode extends LightningElement {
     timeModeOptions = TIME_MODE_OPTIONS;
+    sourceFilterOptions = SOURCE_FILTER_OPTIONS;
     radiusOptions = RADIUS_OPTIONS;
     packageTargetOptions = PACKAGE_TARGET_OPTIONS;
     flatColumns = FLAT_COLUMNS;
     treeColumns = TREE_COLUMNS;
 
     timeMode = 'window';
+    sourceFilterInput = '';
     windowStartInput;
     windowEndInput;
     incidentTimestampInput;
@@ -104,6 +119,7 @@ export default class AuditrAuditMode extends LightningElement {
     windowEnd;
     actorUsername = '';
     appliedHighRiskOnly = false;
+    appliedSourceFilter = '';
 
     userDisplayInfo = { additionalFields: ['Username'] };
     userMatchingInfo = {
@@ -160,7 +176,8 @@ export default class AuditrAuditMode extends LightningElement {
         windowStart: '$windowStart',
         windowEnd: '$windowEnd',
         actorUsername: '$actorUsername',
-        highRiskOnly: '$appliedHighRiskOnly'
+        highRiskOnly: '$appliedHighRiskOnly',
+        sourceFilter: '$appliedSourceFilter'
     })
     wiredEntries(result) {
         this.wiredEntriesResult = result;
@@ -168,13 +185,7 @@ export default class AuditrAuditMode extends LightningElement {
         this.isLoading = false;
         if (data) {
             const rawEntries = Array.isArray(data) ? data : (data.entries || []);
-            this.entryRows = rawEntries.map((row) => ({
-                ...row,
-                displayName: row.name,
-                recordUrl: `/${row.recordId}`,
-                changeRequestUrl: row.changeLogId ? `/${row.changeLogId}` : null,
-                changeRequestDisplay: row.isPackaged ? (row.changeRequestId || row.changeLogName || 'Packaged') : 'Unassigned'
-            }));
+            this.entryRows = rawEntries.map((row) => this.decorateEntryRow(row));
             if (Array.isArray(data)) {
                 this.scopeTotalCount = this.entryRows.length;
                 this.scopeUnassignedCount = this.entryRows.filter((e) => !e.isPackaged).length;
@@ -335,6 +346,10 @@ export default class AuditrAuditMode extends LightningElement {
         this.timeMode = event.detail.value;
     }
 
+    handleSourceFilterChange(event) {
+        this.sourceFilterInput = event.detail.value;
+    }
+
     handleWindowStartChange(event) {
         this.windowStartInput = event.detail.value;
     }
@@ -393,8 +408,26 @@ export default class AuditrAuditMode extends LightningElement {
         }
         this.actorUsername = this.actorInput;
         this.appliedHighRiskOnly = this.highRiskOnly;
+        this.appliedSourceFilter = this.sourceFilterInput;
         this.selectedEntryIds = [];
         this.gridSelectedRows = [];
+    }
+
+    decorateEntryRow(row) {
+        const isWatched = row.source === 'DataChange';
+        return {
+            ...row,
+            displayName: row.name,
+            recordUrl: `/${row.recordId}`,
+            targetRecordUrl: row.targetRecordId ? `/${row.targetRecordId}` : null,
+            targetRecordLabel: row.targetObject && row.targetRecordId
+                ? `${row.targetObject} (${row.targetRecordId})`
+                : (row.targetObject || ''),
+            changeRequestUrl: row.changeLogId ? `/${row.changeLogId}` : null,
+            changeRequestDisplay: isWatched
+                ? 'Investigation Only'
+                : (row.isPackaged ? (row.changeRequestId || row.changeLogName || 'Packaged') : 'Unassigned')
+        };
     }
 
     handleFlatRowSelection(event) {
@@ -453,17 +486,12 @@ export default class AuditrAuditMode extends LightningElement {
                 actorUsername: this.actorUsername,
                 highRiskOnly: this.appliedHighRiskOnly,
                 continuationOccurredAt: this.lastOccurredAt,
-                continuationId: this.lastEntryId
+                continuationId: this.lastEntryId,
+                sourceFilter: this.appliedSourceFilter
             });
 
             if (nextEnvelope && Array.isArray(nextEnvelope.entries)) {
-                const newRows = nextEnvelope.entries.map((row) => ({
-                    ...row,
-                    displayName: row.name,
-                    recordUrl: `/${row.recordId}`,
-                    changeRequestUrl: row.changeLogId ? `/${row.changeLogId}` : null,
-                    changeRequestDisplay: row.isPackaged ? (row.changeRequestId || row.changeLogName || 'Packaged') : 'Unassigned'
-                }));
+                const newRows = nextEnvelope.entries.map((row) => this.decorateEntryRow(row));
 
                 this.entryRows = [...this.entryRows, ...newRows];
                 this.hasMore = nextEnvelope.hasMore ?? false;

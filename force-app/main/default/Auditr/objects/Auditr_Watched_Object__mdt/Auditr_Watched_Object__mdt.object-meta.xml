@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Configures sensitive SObjects monitored by Auditr via standard Salesforce Field History Tracking. Captures which fields changed, who changed them, and when — never field values.</description>
+    <label>Auditr Watched Object</label>
+    <pluralLabel>Auditr Watched Objects</pluralLabel>
+    <visibility>Public</visibility>
+</CustomObject>

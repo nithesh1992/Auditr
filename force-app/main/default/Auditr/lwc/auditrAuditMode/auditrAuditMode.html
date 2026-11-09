@@ -28,15 +28,27 @@
 
         <!-- Unified Investigation Filter Bar -->
         <div class="filter-panel">
-            <div class="time-mode-selector slds-m-bottom_medium">
-                <lightning-radio-group
-                    name="timeMode"
-                    label="Investigation Time Mode"
-                    options={timeModeOptions}
-                    value={timeMode}
-                    type="button"
-                    onchange={handleTimeModeChange}
-                ></lightning-radio-group>
+            <div class="filter-top-row slds-m-bottom_medium">
+                <div class="time-mode-selector">
+                    <lightning-radio-group
+                        name="timeMode"
+                        label="Investigation Time Mode"
+                        options={timeModeOptions}
+                        value={timeMode}
+                        type="button"
+                        onchange={handleTimeModeChange}
+                    ></lightning-radio-group>
+                </div>
+                <div class="source-filter-selector">
+                    <lightning-radio-group
+                        name="sourceFilter"
+                        label="Event Source"
+                        options={sourceFilterOptions}
+                        value={sourceFilterInput}
+                        type="button"
+                        onchange={handleSourceFilterChange}
+                    ></lightning-radio-group>
+                </div>
             </div>
 
             <!-- Row 1: Symmetrically Aligned 3-Column Inputs Grid -->

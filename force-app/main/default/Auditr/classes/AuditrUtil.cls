@@ -3,6 +3,7 @@
  */
 public with sharing class AuditrUtil {
     public static final String DEFAULT_SOURCE = 'SetupAuditTrail';
+    public static final String DATA_CHANGE_SOURCE = 'DataChange';
     public static final String DEFAULT_ACTOR_USERNAME = 'System';
     public static final String DEFAULT_SECTION = 'General';
     public static final String DEFAULT_CATEGORY = 'Unclassified';
@@ -16,6 +17,7 @@ public with sharing class AuditrUtil {
     @TestVisible private static List<Auditr_Rule__mdt> testRulesOverride;
     private static List<Auditr_Rule__mdt> cachedActiveRules;
     private static Id cachedSetupAuditTrailRecordTypeId;
+    private static Id cachedDataChangeRecordTypeId;
 
     /**
      * @description Holds the resolved Category and Risk Level for an audit event.
@@ -97,6 +99,21 @@ public with sharing class AuditrUtil {
     }
 
     /**
+     * @description Returns the active Data_Change (Watched Object) record type Id on Auditr_Entry__c.
+     * Resolved via describe metadata (no SOQL) and cached per transaction.
+     * @return RecordType Id for the Data_Change record type, or null.
+     */
+    public static Id getDataChangeRecordTypeId() {
+        if (cachedDataChangeRecordTypeId == null) {
+            Schema.RecordTypeInfo recordTypeInfo = Schema.SObjectType.Auditr_Entry__c.getRecordTypeInfosByDeveloperName().get('Data_Change');
+            if (recordTypeInfo != null && recordTypeInfo.isActive()) {
+                cachedDataChangeRecordTypeId = recordTypeInfo.getRecordTypeId();
+            }
+        }
+        return cachedDataChangeRecordTypeId;
+    }
+
+    /**
      * @description Returns all active Auditr_Rule__mdt rules ordered by Priority__c ASC.
      * @return Ordered list of active Auditr_Rule__mdt records.
      */
@@ -120,13 +137,109 @@ public with sharing class AuditrUtil {
      */
     @SuppressWarnings('PMD.ExcessiveParameterList')
     public static ClassificationResult classify(String actionCode, String section, String namespacePrefix, String delegateUser) {
+        return classify(DEFAULT_SOURCE, actionCode, section, namespacePrefix, delegateUser);
+    }
+
+    /**
+     * @description Evaluates active rules scoped to a source (rules with blank Source__c apply to SetupAuditTrail).
+     * @param source Auditr_Entry__c.Source__c value (blank = SetupAuditTrail).
+     * @param actionCode Action code value.
+     * @param section Section value.
+     * @param namespacePrefix Namespace prefix value.
+     * @param delegateUser Delegate user value.
+     * @return ClassificationResult with matched Category and Risk Level (or Unclassified / Low).
+     */
+    @SuppressWarnings('PMD.ExcessiveParameterList')
+    public static ClassificationResult classify(String source, String actionCode, String section, String namespacePrefix, String delegateUser) {
+        String entrySource = String.isNotBlank(source) ? source : DEFAULT_SOURCE;
         for (Auditr_Rule__mdt rule : getActiveRules()) {
+            String ruleSource = String.isNotBlank(rule.Source__c) ? rule.Source__c.trim() : DEFAULT_SOURCE;
+            if (!ruleSource.equalsIgnoreCase(entrySource)) {
+                continue;
+            }
             String target = resolveTargetValue(rule.Match_Target__c, actionCode, section, namespacePrefix, delegateUser);
             if (matchesRule(target, rule.Match_Operator__c, rule.Match_Value__c)) {
                 return new ClassificationResult(rule.Category__c, rule.Risk_Level__c);
             }
         }
         return new ClassificationResult(DEFAULT_CATEGORY, DEFAULT_RISK_LEVEL);
+    }
+
+    /**
+     * @description Evaluates active DataChange rules against a Watched Object event (matching TargetObject,
+     * ChangedField, Action, Section, or DelegateUser) and falls back to the watched object's configured Category and Risk Level.
+     * @param targetObject SObject API name (for example Account).
+     * @param changedFields List of field API names changed in the save transaction.
+     * @param actionCode Synthesized action code (for example field_changed:OwnerId).
+     * @param section Synthesized section value.
+     * @param fallbackCategory Default category from Auditr_Watched_Object__mdt.
+     * @param fallbackRiskLevel Default risk level from Auditr_Watched_Object__mdt.
+     * @return ClassificationResult with matched rule or watched-object defaults.
+     */
+    @SuppressWarnings('PMD.ExcessiveParameterList')
+    public static ClassificationResult classifyWatchedObject(
+        String targetObject,
+        List<String> changedFields,
+        String actionCode,
+        String section,
+        String fallbackCategory,
+        String fallbackRiskLevel
+    ) {
+        return classifyWatchedObject(
+            targetObject,
+            changedFields,
+            actionCode,
+            section,
+             null,
+            fallbackCategory,
+            fallbackRiskLevel
+        );
+    }
+
+    /**
+     * @description Evaluates active DataChange rules against a Watched Object event (matching TargetObject,
+     * ChangedField, Action, Section, or DelegateUser) and falls back to the watched object's configured Category and Risk Level.
+     * @param targetObject SObject API name (for example Account).
+     * @param changedFields List of field API names changed in the save transaction.
+     * @param actionCode Synthesized action code (for example field_changed:OwnerId).
+     * @param section Synthesized section value.
+     * @param delegateUser Inferred Delegate User from an active Login-As session (or null).
+     * @param fallbackCategory Default category from Auditr_Watched_Object__mdt.
+     * @param fallbackRiskLevel Default risk level from Auditr_Watched_Object__mdt.
+     * @return ClassificationResult with matched rule or watched-object defaults.
+     */
+    @SuppressWarnings('PMD.ExcessiveParameterList')
+    public static ClassificationResult classifyWatchedObject(
+        String targetObject,
+        List<String> changedFields,
+        String actionCode,
+        String section,
+        String delegateUser,
+        String fallbackCategory,
+        String fallbackRiskLevel
+    ) {
+        for (Auditr_Rule__mdt rule : getActiveRules()) {
+            String ruleSource = String.isNotBlank(rule.Source__c) ? rule.Source__c.trim() : DEFAULT_SOURCE;
+            if (!ruleSource.equalsIgnoreCase(DATA_CHANGE_SOURCE)) {
+                continue;
+            }
+            if (rule.Match_Target__c == 'ChangedField') {
+                if (matchesAnyField(changedFields, rule.Match_Operator__c, rule.Match_Value__c)) {
+                    return new ClassificationResult(rule.Category__c, rule.Risk_Level__c);
+                }
+                continue;
+            }
+            String target = (rule.Match_Target__c == 'TargetObject')
+                ? targetObject
+                : resolveTargetValue(rule.Match_Target__c, actionCode, section, null, delegateUser);
+            if (matchesRule(target, rule.Match_Operator__c, rule.Match_Value__c)) {
+                return new ClassificationResult(rule.Category__c, rule.Risk_Level__c);
+            }
+        }
+        return new ClassificationResult(
+            String.isNotBlank(fallbackCategory) ? fallbackCategory : 'Data & Schema',
+            String.isNotBlank(fallbackRiskLevel) ? fallbackRiskLevel : 'Medium'
+        );
     }
 
     /**
@@ -180,6 +293,18 @@ public with sharing class AuditrUtil {
             when 'DelegateUser' { return delegateUser; }
             when else { return null; }
         }
+    }
+
+    private static Boolean matchesAnyField(List<String> changedFields, String operatorName, String matchValue) {
+        if (changedFields == null || changedFields.isEmpty()) {
+            return false;
+        }
+        for (String fieldName : changedFields) {
+            if (matchesRule(fieldName, operatorName, matchValue)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Boolean matchesRule(String targetValue, String operatorName, String matchValue) {

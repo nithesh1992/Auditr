@@ -101,6 +101,20 @@ describe('c-auditr-control-center', () => {
             ],
             topUnclassifiedActions: [
                 { actionCode: 'customaction', section: 'Custom Setup', entryCount: 4 }
+            ],
+            watchedObjectEntries: 7,
+            watchedObjects: [
+                {
+                    developerName: 'Account_Example',
+                    label: 'Account (Example)',
+                    objectApiName: 'Account',
+                    historyObjectName: 'AccountHistory',
+                    isActive: true,
+                    isReady: true,
+                    defaultRiskLevel: 'Medium',
+                    watchedFields: ['OwnerId', 'Rating'],
+                    statusMessage: 'Ready (AccountHistory).'
+                }
             ]
         });
 

@@ -12,7 +12,7 @@
 
 **Documentation:** <https://nithesh1992.github.io/Auditr/>
 
-**Long-term, classified Setup Audit Trail history inside your org — now with compliance change packaging.** Auditr covers **Setup Audit Trail (`SetupAuditTrail`) only**. It incrementally syncs `SetupAuditTrail` into `Auditr_Entry__c` records, blocks edits and deletes through normal use, classifies each setup change by risk level and security domain using Custom Metadata rules, and organizes work into focused tabs: **Auditr Home** (posture KPIs + dashboard), **Audit Mode** (unified incident investigation, actor bursts, and compliance change packaging into sealed, CR-bound change logs), **Auditr Control Center** (sync, retention, and rule operations), and **Change Logs** (lifecycle and sign-offs).
+**Long-term, classified Setup Audit Trail & Watched Object history inside your org — with compliance change packaging.** Auditr incrementally syncs `SetupAuditTrail` and opt-in **Watched Objects** (via standard Salesforce Field History Tracking, capturing *which* fields changed, *who* changed them, and *when* — never field values) into `Auditr_Entry__c` records through a pluggable `AuditrSource` adapter framework. It blocks edits and deletes through normal use, classifies each event by risk level and security domain using Custom Metadata rules, and organizes work into focused tabs: **Auditr Home** (posture KPIs + dashboard), **Audit Mode** (unified incident investigation across sources, actor bursts, and compliance change packaging into sealed, CR-bound change logs), **Auditr Control Center** (sync, Watched Object readiness, retention, and rule operations), and **Change Logs** (lifecycle and sign-offs).
 
 **Classified fields on `Auditr_Entry__c`:**
 
@@ -43,15 +43,16 @@ Display__c:              Assigned Permission Set "Modify_All_Data" to user john.
 
 ## What Auditr does
 
-- **Covers Setup Audit Trail (`SetupAuditTrail`) only.** Auditr tracks org configuration and metadata changes recorded in `SetupAuditTrail` (it does not track business-object record edits, LoginHistory, or Event Monitoring).
-- **Retains Setup Audit Trail beyond 180 days.** `AuditrSyncBatch` incrementally syncs `SetupAuditTrail` using an indexed `Source_Record_Id__c` external ID watermark with a 2-day overlap buffer and in-chunk deduplication (`Database.insert(..., false)`), inspecting row-level `SaveResult` records so duplicates are prevented and late-committed setup events are captured.
+- **Pluggable Multi-Source Ingestion (`AuditrSource` + `Auditr_Source__mdt`).** `AuditrSyncBatch` dispatches one independent batch job per active source adapter so a failure in one source never blocks another. Every source inherits per-source watermark + overlap replay, `Source_Record_Id__c` deduplication, and stateful partial-DML failure surfacing.
+- **Watched Objects (`Auditr_Watched_Object__mdt` + `AuditrWatchedObjectSource`).** Monitor sensitive standard or custom objects via standard Salesforce Field History Tracking — **without Shield and without storing confidential field values**. Auditr records only *which fields changed*, *who* changed them, *when*, and on *which record* (`Target_Object__c`, `Target_Record_Id__c`), grouping consecutive changes by the same user on the same record at the exact same timestamp into a single entry (splitting immediately on any interruption) and surviving record deletion. Investigators click straight through to the record's native History related list when they need before/after values.
+- **Retains Setup Audit Trail beyond 180 days.** `AuditrSetupAuditTrailSource` incrementally syncs `SetupAuditTrail` using an indexed `Source_Record_Id__c` external ID watermark with a 2-day overlap buffer and in-chunk deduplication (`Database.insert(..., false)`), inspecting row-level `SaveResult` records so duplicates are prevented and late-committed setup events within the overlap window are captured.
 - **Blocks edits and deletes through normal use.** `AuditrEntryTrigger` blocks `before delete` unless `AuditrPurgeBatch.execute` is on the call stack, and blocks `before update` on all source/provenance fields so only `Category__c` and `Risk_Level__c` can be reclassified.
 - **Metadata-driven classification.** Ships with 36 `Auditr_Rule__mdt` rules (`Equals`, `StartsWith`, `Contains`, `NotBlank`) evaluated in `Priority__c` order across `Critical`, `High`, `Medium`, and `Low` risk levels and 6 domain categories (`Security & Access`, `Users & Sessions`, `Code & Automation`, `Data & Schema`, `Org Preferences`, `Packages & Integrations`).
 - **Impersonation & delegate tracking.** Automatically computes `Is_Impersonated__c` and `Responsible_Username__c` when changes are made via delegated admin or *Log in As*.
 - **Auditr Home At-a-Glance (`auditrAtAGlance`).** 7-KPI rolling summary strip (`Total Events`, `Critical & High`, `Security & Access`, `Automation & Code`, `Impersonated`, `Unclassified`, **`Unassigned Changes`** — entries with no change log citation) with compact numbers (`25K`, `1.5M`) and window filters (up to 1 year).
 - **Incident Mode (`auditrIncidentMode`).** Dedicated tab that pinpoints every setup change within `±15m` to `±12h` of an incident timestamp, auto-anchored to the newest synced event.
 - **Audit Mode & Change Packaging (`auditrAuditMode`).** Compliance workspace that surfaces the **unassigned changes backlog** (entries with no citation — SOX ITGC unauthorized-change exceptions) and packages them into `Auditr_Change_Log__c` containers tied to a mandatory, format-validated `Change_Request_Id__c`. Citations are `Auditr_Change_Log_Item__c` junction records with a compound unique key, so one event can serve multiple audit scopes (release manifest, incident bundle, SOX review). Packaging runs asynchronously via `AuditrChangeLogBatch` for 10,000+ entry release windows. Sealed logs are fully immutable and stamp auditor sign-off automatically.
-- **Reserved multi-source schema foundation.** `Auditr_Entry__c` includes three record types (`Setup Audit Trail` default, `Login History`, `Data Change`) plus a reserved `Payload__c` column. These are reserved schema placeholders; ingestion, retention, security gates, and tests currently cover `SetupAuditTrail` exclusively.
+- **Multi-Source Schema (`Setup Audit Trail`, `Watched Object`, and reserved `Login History`).** `Auditr_Entry__c` ships active pipelines for `SetupAuditTrail` and `DataChange` (Watched Objects), plus a reserved `Login_History` record type for optional future Login History adapters.
 - **Custom Read-Only Detail Component (`auditrRecordDetail`).** Renders source provenance fields read-only with no inline editing pencils while allowing admins to reclassify Risk Level & Category in a dedicated modal.
 - **Field History Tracking.** Built-in field history tracking across audit entry fields with a dedicated `Histories` tab on the record page.
 - **Control Center (`auditrControlCenter`).** Shows the last `AsyncApexJob` status and completed time for `AuditrSyncBatch` alongside the age of the newest entry's `Occurred_At__c`, lets admins run **Sync Now**, schedule daily sync and daily retention purge side-by-side, trigger **Reclassify Unclassified** or **Reclassify All**, run **Retention Purge** (packaged evidence exempt), inspect top unclassified setup actions (last 30 days), and search active classification rules.
@@ -113,14 +114,14 @@ By default, Auditr retains all `Auditr_Entry__c` records indefinitely (`Enable_P
 
 ## Install
 
-**Unlocked package (`Auditr@1.2.1-1`)**
+**Unlocked package (`Auditr@1.3.0-1`)**
 
 ```bash
-sf package install --package 04tg7000000dLJ7AAM --target-org <alias> --wait 10
+sf package install --package 04tg7000000e1YTAAY --target-org <alias> --wait 10
 ```
 
-Production: <https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000dLJ7AAM>  
-Sandbox: <https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000dLJ7AAM>
+Production: <https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000e1YTAAY>  
+Sandbox: <https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000e1YTAAY>
 
 **From source**
 

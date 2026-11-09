@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Adapter_Class__c</fullName>
+    <description>API name of the Apex class extending AuditrSource that reads and maps this source.</description>
+    <externalId>false</externalId>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <inlineHelpText>Apex class extending AuditrSource (for example AuditrSetupAuditTrailSource).</inlineHelpText>
+    <label>Adapter Class</label>
+    <length>255</length>
+    <required>true</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

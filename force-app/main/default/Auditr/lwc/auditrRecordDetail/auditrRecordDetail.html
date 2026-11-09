@@ -52,9 +52,24 @@
         </template>
 
         <!-- Audit Trail Change Description -->
-        <div class="display-box" title="SetupAuditTrail Display">
+        <div class="display-box" title="Audit Event Display">
             {displayText}
         </div>
+
+        <!-- Conditional Warning Banner for Inferred Login-As Delegation on Watched Objects -->
+        <template lwc:if={isInferredWatchedObjectDelegate}>
+            <div class="inferred-delegate-warning" role="alert" data-id="inferredDelegateWarning">
+                <lightning-icon
+                    icon-name="utility:warning"
+                    size="x-small"
+                    variant="warning"
+                    class="warning-icon">
+                </lightning-icon>
+                <div class="warning-text">
+                    <strong>Inferred Login-As Delegation:</strong> Delegate User (<strong>{delegateUser}</strong>) was inferred by correlating this data change's timestamp with an active Login-As session in Setup Audit Trail. Because standard Salesforce Field History does not record session IDs, it is still possible that the original user (<strong>{actorUsername}</strong>) made this change concurrently.
+                </div>
+            </div>
+        </template>
 
         <!-- Compact 2-Row Read-Only Metadata Grid (10 Fields) -->
         <div class="meta-grid">
@@ -90,7 +105,12 @@
             </div>
             <div class="meta-item">
                 <div class="meta-label">Delegate User</div>
-                <div class="meta-value" title={delegateUser}>{delegateUser}</div>
+                <div class="meta-value" title={delegateUser}>
+                    {delegateUser}
+                    <template lwc:if={isInferredWatchedObjectDelegate}>
+                        <span class="inferred-tag" title="Inferred from Setup Audit Trail Login-As session window">Inferred</span>
+                    </template>
+                </div>
             </div>
             <div class="meta-item">
                 <div class="meta-label">Actor Context</div>
@@ -108,6 +128,31 @@
                 <div class="meta-label">Source Record ID</div>
                 <div class="meta-value mono" title={sourceRecordId}>{sourceRecordId}</div>
             </div>
+            <template lwc:if={hasWatchedTarget}>
+                <div class="meta-item">
+                    <div class="meta-label">Watched Object</div>
+                    <div class="meta-value" title={targetObject}>{targetObject}</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Target Record ID</div>
+                    <div class="meta-value mono" title={targetRecordId}>
+                        <template lwc:if={targetRecordUrl}>
+                            <a href={targetRecordUrl} target="_blank" rel="noopener">{targetRecordId}</a>
+                        </template>
+                        <template lwc:else>{targetRecordId}</template>
+                    </div>
+                </div>
+                <template lwc:if={hasChangedFields}>
+                    <div class="meta-item meta-item_wide">
+                        <div class="meta-label">Changed Fields</div>
+                        <div class="field-pill-list">
+                            <template for:each={changedFields} for:item="fieldName">
+                                <span key={fieldName} class="field-pill mono">{fieldName}</span>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+            </template>
         </div>
     </div>
 </template>

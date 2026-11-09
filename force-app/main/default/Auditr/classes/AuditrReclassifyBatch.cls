@@ -34,14 +34,14 @@ public with sharing class AuditrReclassifyBatch implements Database.Batchable<SO
     public Database.QueryLocator start(Database.BatchableContext context) {
         if (this.onlyUnclassified) {
             return Database.getQueryLocator([
-                SELECT Id, Action_Code__c, Section__c, Namespace_Prefix__c, Delegate_User__c, Category__c, Risk_Level__c
+                SELECT Id, Source__c, Target_Object__c, Payload__c, Action_Code__c, Section__c, Namespace_Prefix__c, Delegate_User__c, Category__c, Risk_Level__c
                 FROM Auditr_Entry__c
                 WHERE Category__c = :AuditrUtil.DEFAULT_CATEGORY
                 WITH SYSTEM_MODE
             ]);
         }
         return Database.getQueryLocator([
-            SELECT Id, Action_Code__c, Section__c, Namespace_Prefix__c, Delegate_User__c, Category__c, Risk_Level__c
+            SELECT Id, Source__c, Target_Object__c, Payload__c, Action_Code__c, Section__c, Namespace_Prefix__c, Delegate_User__c, Category__c, Risk_Level__c
             FROM Auditr_Entry__c
             WHERE Source__c != NULL
             WITH SYSTEM_MODE
@@ -56,12 +56,27 @@ public with sharing class AuditrReclassifyBatch implements Database.Batchable<SO
     public void execute(Database.BatchableContext context, List<SObject> scope) {
         List<Auditr_Entry__c> entriesToUpdate = new List<Auditr_Entry__c>();
         for (Auditr_Entry__c entry : (List<Auditr_Entry__c>) scope) {
-            AuditrUtil.ClassificationResult result = AuditrUtil.classify(
-                entry.Action_Code__c,
-                entry.Section__c,
-                entry.Namespace_Prefix__c,
-                entry.Delegate_User__c
-            );
+            AuditrUtil.ClassificationResult result;
+            if (entry.Source__c == AuditrUtil.DATA_CHANGE_SOURCE) {
+                AuditrUtil.ClassificationResult defaults = AuditrWatchedObjectSource.getDefaultsForObject(entry.Target_Object__c);
+                result = AuditrUtil.classifyWatchedObject(
+                    entry.Target_Object__c,
+                    extractChangedFields(entry.Payload__c),
+                    entry.Action_Code__c,
+                    entry.Section__c,
+                    entry.Delegate_User__c,
+                    defaults.category,
+                    defaults.riskLevel
+                );
+            } else {
+                result = AuditrUtil.classify(
+                    entry.Source__c,
+                    entry.Action_Code__c,
+                    entry.Section__c,
+                    entry.Namespace_Prefix__c,
+                    entry.Delegate_User__c
+                );
+            }
             if (entry.Category__c != result.category || entry.Risk_Level__c != result.riskLevel) {
                 entry.Category__c = result.category;
                 entry.Risk_Level__c = result.riskLevel;
@@ -102,5 +117,26 @@ public with sharing class AuditrReclassifyBatch implements Database.Batchable<SO
                 ' failed record updates. First error: ' + firstErrorMessage
             );
         }
+    }
+
+    private static List<String> extractChangedFields(String payloadJson) {
+        List<String> fields = new List<String>();
+        if (String.isBlank(payloadJson)) {
+            return fields;
+        }
+        try {
+            Map<String, Object> parsed = (Map<String, Object>) JSON.deserializeUntyped(payloadJson);
+            Object rawList = (parsed != null) ? parsed.get('fields') : null;
+            if (rawList instanceof List<Object>) {
+                for (Object item : (List<Object>) rawList) {
+                    if (item != null) {
+                        fields.add(String.valueOf(item));
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            return fields;
+        }
+        return fields;
     }
 }

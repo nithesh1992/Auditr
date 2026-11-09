@@ -31,6 +31,16 @@
                 <default>false</default>
                 <label>DelegateUser</label>
             </value>
+            <value>
+                <fullName>TargetObject</fullName>
+                <default>false</default>
+                <label>TargetObject</label>
+            </value>
+            <value>
+                <fullName>ChangedField</fullName>
+                <default>false</default>
+                <label>ChangedField</label>
+            </value>
         </valueSetDefinition>
     </valueSet>
 </CustomField>

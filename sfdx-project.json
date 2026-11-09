@@ -4,9 +4,9 @@
       "path": "force-app/main/default/Auditr",
       "default": true,
       "package": "Auditr",
-      "versionName": "v1.2.1",
-      "versionNumber": "1.2.1.NEXT",
-      "versionDescription": "Lean, immutable Salesforce Setup Audit Trail intelligence and security monitoring framework."
+      "versionName": "v1.3.0",
+      "versionNumber": "1.3.0.NEXT",
+      "versionDescription": "Extensible multi-source ingestion architecture, Watched Objects (Field History) tracking, and Login-As delegation correlation."
     },
     {
       "path": "force-app/test",
@@ -24,6 +24,7 @@
     "Auditr@1.1.0-1": "04tg7000000coevAAA",
     "Auditr@1.1.1-1": "04tg7000000coobAAA",
     "Auditr@1.2.0-1": "04tg7000000dK8XAAU",
-    "Auditr@1.2.1-1": "04tg7000000dLJ7AAM"
+    "Auditr@1.2.1-1": "04tg7000000dLJ7AAM",
+    "Auditr@1.3.0-1": "04tg7000000e1YTAAY"
   }
 }

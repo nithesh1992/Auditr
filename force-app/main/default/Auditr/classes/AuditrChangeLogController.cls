@@ -43,6 +43,9 @@ public with sharing class AuditrChangeLogController {
     public class AuditEntryDTO {
         @AuraEnabled public Id recordId;
         @AuraEnabled public String name;
+        @AuraEnabled public String source;
+        @AuraEnabled public String targetObject;
+        @AuraEnabled public String targetRecordId;
         @AuraEnabled public DateTime occurredAt;
         @AuraEnabled public String riskLevel;
         @AuraEnabled public String category;
@@ -183,16 +186,24 @@ public with sharing class AuditrChangeLogController {
     }
 
     /**
-     * @description Returns all audit entries matching the window, actor, and risk criteria, with packaging citations and scope totals.
+     * @description Returns all audit entries matching the window, actor, risk, and optional source criteria.
      * @param windowStart Inclusive Occurred_At__c lower bound (defaults to System.now() - 30 days).
      * @param windowEnd Inclusive Occurred_At__c upper bound (defaults to System.now()).
      * @param actorUsername Optional exact Responsible_Username__c filter.
      * @param highRiskOnly When true, filters to Critical and High risk entries only.
+     * @param sourceFilter Optional Source__c filter ('SetupAuditTrail', 'DataChange', 'LoginHistory', or blank for all).
      * @return AuditEntriesEnvelopeDTO containing up to 200 AuditEntryDTO rows newest-first and aggregate counts.
      */
     @AuraEnabled(cacheable=true)
-    public static AuditEntriesEnvelopeDTO getAuditEntries(DateTime windowStart, DateTime windowEnd, String actorUsername, Boolean highRiskOnly) {
-        return getAuditEntriesWithContinuation(windowStart, windowEnd, actorUsername, highRiskOnly, null, null);
+    @SuppressWarnings('PMD.ExcessiveParameterList')
+    public static AuditEntriesEnvelopeDTO getAuditEntries(
+        DateTime windowStart,
+        DateTime windowEnd,
+        String actorUsername,
+        Boolean highRiskOnly,
+        String sourceFilter
+    ) {
+        return getAuditEntriesWithContinuation(windowStart, windowEnd, actorUsername, highRiskOnly, null, null, sourceFilter);
     }
 
     /**
@@ -203,6 +214,7 @@ public with sharing class AuditrChangeLogController {
      * @param highRiskOnly When true, filters to Critical and High risk entries only.
      * @param continuationOccurredAt Last Occurred_At__c received from previous page (for keyset pagination).
      * @param continuationId Last record Id received from previous page (for keyset pagination tie-breaking).
+     * @param sourceFilter Optional Source__c filter ('SetupAuditTrail', 'DataChange', 'LoginHistory', or blank for all).
      * @return AuditEntriesEnvelopeDTO with next slice and continuation markers.
      */
     @AuraEnabled(cacheable=true)
@@ -213,14 +225,24 @@ public with sharing class AuditrChangeLogController {
         String actorUsername,
         Boolean highRiskOnly,
         DateTime continuationOccurredAt,
-        Id continuationId
+        Id continuationId,
+        String sourceFilter
     ) {
         DateTime effectiveStart = resolveWindowStart(windowStart);
         DateTime effectiveEnd = resolveWindowEnd(windowEnd);
         String actor = normalizeActor(actorUsername);
+        String normalizedSource = normalizeSourceFilter(sourceFilter);
         List<String> allowedRisks = (highRiskOnly == true) ? new List<String>{ 'Critical', 'High' } : null;
 
-        List<Auditr_Entry__c> entries = queryAuditEntrySlice(effectiveStart, effectiveEnd, actor, allowedRisks, continuationOccurredAt, continuationId);
+        List<Auditr_Entry__c> entries = queryAuditEntrySlice(
+            effectiveStart,
+            effectiveEnd,
+            actor,
+            allowedRisks,
+            continuationOccurredAt,
+            continuationId,
+            normalizedSource
+        );
 
         List<AuditEntryDTO> rows = new List<AuditEntryDTO>();
         Integer unassignedInSlice = 0;
@@ -228,6 +250,9 @@ public with sharing class AuditrChangeLogController {
             AuditEntryDTO dto = new AuditEntryDTO();
             dto.recordId = entry.Id;
             dto.name = entry.Name;
+            dto.source = entry.Source__c;
+            dto.targetObject = entry.Target_Object__c;
+            dto.targetRecordId = entry.Target_Record_Id__c;
             dto.occurredAt = entry.Occurred_At__c;
             dto.riskLevel = entry.Risk_Level__c;
             dto.category = entry.Category__c;
@@ -246,7 +271,9 @@ public with sharing class AuditrChangeLogController {
                 dto.changeLogId = null;
                 dto.changeLogName = null;
                 dto.changeRequestId = null;
-                unassignedInSlice++;
+                if (entry.Source__c == null || entry.Source__c == AuditrUtil.DEFAULT_SOURCE) {
+                    unassignedInSlice++;
+                }
             }
             rows.add(dto);
         }
@@ -267,14 +294,20 @@ public with sharing class AuditrChangeLogController {
         if (continuationOccurredAt == null && entries.size() < entryQueryLimit) {
             envelope.totalMatchingCount = entries.size();
             envelope.totalUnassignedCount = unassignedInSlice;
-            envelope.totalPackagedCount = entries.size() - unassignedInSlice;
+            envelope.totalPackagedCount = (normalizedSource != null && normalizedSource != AuditrUtil.DEFAULT_SOURCE)
+                ? 0
+                : (entries.size() - unassignedInSlice);
             envelope.isCapped = false;
         } else if (continuationOccurredAt == null) {
-            Integer totalMatches = countMatchingEntries(effectiveStart, effectiveEnd, actor, allowedRisks);
-            Integer totalUnassigned = countUnassignedEntries(effectiveStart, effectiveEnd, actor, allowedRisks);
+            Integer totalMatches = countMatchingEntries(effectiveStart, effectiveEnd, actor, allowedRisks, normalizedSource);
+            Integer totalUnassigned = (normalizedSource != null && normalizedSource != AuditrUtil.DEFAULT_SOURCE)
+                ? 0
+                : countUnassignedEntries(effectiveStart, effectiveEnd, actor, allowedRisks);
             envelope.totalMatchingCount = totalMatches;
             envelope.totalUnassignedCount = totalUnassigned;
-            envelope.totalPackagedCount = Math.max(0, totalMatches - totalUnassigned);
+            envelope.totalPackagedCount = (normalizedSource != null && normalizedSource != AuditrUtil.DEFAULT_SOURCE)
+                ? 0
+                : Math.max(0, totalMatches - totalUnassigned);
             envelope.isCapped = (totalMatches >= BACKLOG_COUNT_CAP);
         }
 
@@ -493,15 +526,17 @@ public with sharing class AuditrChangeLogController {
         }
     }
 
+    @SuppressWarnings('PMD.ExcessiveParameterList')
     private static List<Auditr_Entry__c> queryAuditEntrySlice(
         DateTime effectiveStart,
         DateTime effectiveEnd,
         String actor,
         List<String> allowedRisks,
         DateTime continuationOccurredAt,
-        Id continuationId
+        Id continuationId,
+        String normalizedSource
     ) {
-        String baseQuery = 'SELECT Id, Name, Occurred_At__c, Risk_Level__c, Category__c, Section__c, Action_Code__c, ' +
+        String baseQuery = 'SELECT Id, Name, Source__c, Target_Object__c, Target_Record_Id__c, Occurred_At__c, Risk_Level__c, Category__c, Section__c, Action_Code__c, ' +
             'Responsible_Username__c, Delegate_User__c, Display__c, ' +
             '(SELECT Id, Change_Log__c, Change_Log__r.Name, Change_Log__r.Change_Request_Id__c, Change_Log__r.Status__c FROM Auditr_Change_Log_Items__r ORDER BY CreatedDate DESC LIMIT 1) ' +
             'FROM Auditr_Entry__c WHERE Occurred_At__c >= :effectiveStart ';
@@ -520,6 +555,11 @@ public with sharing class AuditrChangeLogController {
             baseQuery += 'AND Occurred_At__c <= :effectiveEnd ';
         }
 
+        if (normalizedSource != null) {
+            baseQuery += 'AND Source__c = :normalizedSource ';
+            binds.put('normalizedSource', normalizedSource);
+        }
+
         if (actor != null) {
             baseQuery += 'AND Responsible_Username__c = :actor ';
             binds.put('actor', actor);
@@ -535,13 +575,24 @@ public with sharing class AuditrChangeLogController {
         return Database.queryWithBinds(baseQuery, binds, AccessLevel.USER_MODE);
     }
 
-    private static Integer countMatchingEntries(DateTime effectiveStart, DateTime effectiveEnd, String actor, List<String> allowedRisks) {
+    @SuppressWarnings('PMD.ExcessiveParameterList')
+    private static Integer countMatchingEntries(
+        DateTime effectiveStart,
+        DateTime effectiveEnd,
+        String actor,
+        List<String> allowedRisks,
+        String normalizedSource
+    ) {
         String query = 'SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd ';
         Map<String, Object> binds = new Map<String, Object>{
             'effectiveStart' => effectiveStart,
             'effectiveEnd' => effectiveEnd,
             'cap' => BACKLOG_COUNT_CAP
         };
+        if (normalizedSource != null) {
+            query += 'AND Source__c = :normalizedSource ';
+            binds.put('normalizedSource', normalizedSource);
+        }
         if (actor != null) {
             query += 'AND Responsible_Username__c = :actor ';
             binds.put('actor', actor);
@@ -555,11 +606,14 @@ public with sharing class AuditrChangeLogController {
     }
 
     private static Integer countUnassignedEntries(DateTime effectiveStart, DateTime effectiveEnd, String actor, List<String> allowedRisks) {
+        String setupSource = AuditrUtil.DEFAULT_SOURCE;
         String query = 'SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd ' +
+            'AND Source__c = :setupSource ' +
             'AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL) ';
         Map<String, Object> binds = new Map<String, Object>{
             'effectiveStart' => effectiveStart,
             'effectiveEnd' => effectiveEnd,
+            'setupSource' => setupSource,
             'cap' => BACKLOG_COUNT_CAP
         };
         if (actor != null) {
@@ -605,6 +659,13 @@ public with sharing class AuditrChangeLogController {
 
     private static String normalizeActor(String actorUsername) {
         return String.isBlank(actorUsername) ? null : actorUsername.trim();
+    }
+
+    private static String normalizeSourceFilter(String sourceFilter) {
+        if (String.isBlank(sourceFilter) || 'ALL'.equalsIgnoreCase(sourceFilter.trim())) {
+            return null;
+        }
+        return sourceFilter.trim();
     }
 
     private static AuraHandledException createAuraException(String message) {

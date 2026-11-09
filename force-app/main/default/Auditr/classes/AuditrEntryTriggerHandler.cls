@@ -21,7 +21,9 @@ public with sharing class AuditrEntryTriggerHandler {
         Auditr_Entry__c.Action_Code__c,
         Auditr_Entry__c.Section__c,
         Auditr_Entry__c.Namespace_Prefix__c,
-        Auditr_Entry__c.Display__c
+        Auditr_Entry__c.Display__c,
+        Auditr_Entry__c.Target_Object__c,
+        Auditr_Entry__c.Target_Record_Id__c
     };
 
     /**

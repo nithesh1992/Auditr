@@ -43,9 +43,10 @@ Each row cites **one audit entry inside one change log**, so the same event can 
 
 The workspace is a single unified LWC (`auditrAuditMode`) integrating incident triage and compliance change packaging:
 
-### 1. Dual-Mode Time Filtering
+### 1. Dual-Mode Time Filtering & Event Source Selector
 - **Window (Date Range)** — Specify exact `Occurred From` and `Occurred To` date boundaries (defaults to the last 7 days).
 - **Incident (Time ± Radius)** — Anchor around a critical timestamp with radius presets (`± 15 Minutes`, `± 30 Minutes`, `± 1 Hour`, `± 4 Hours`, `± 12 Hours`) for immediate production root-cause analysis. Auto-anchors to the latest synced event on load.
+- **Event Source (`All Sources` | `Setup Audit Trail` | `Watched Objects`)** — Filter the investigation scope across all ingested sources, Setup changes only, or Watched Object field-history events (`Source__c = 'DataChange'`). Watched Object rows include a direct **Watched Record** link (`Target_Object__c (Target_Record_Id__c)`) so investigators can jump straight to the record's native History related list to inspect before/after values.
 
 ### 2. Investigation Filters
 - **Responsible Actor (User Lookup)** — Powered by `lightning-record-picker` with bidirectional Name/Username resolution and avatar preview. Filters against the indexed `Responsible_Username__c` field.
@@ -79,10 +80,10 @@ The top change log table has been replaced with a streamlined, scalable modal:
 
 ---
 
-## Multi-Source Foundation (Reserved Schema)
+## Multi-Source Investigation vs. Change Log Packaging
 
-::: warning Reserved Schema Foundation
-The `Login History` and `Data Change` record types as well as `Payload__c` on `Auditr_Entry__c` are strictly reserved schema placeholders. Current ingestion pipelines, permission models, retention policies, and unit tests exclusively govern `SetupAuditTrail`. Multi-source ingestion will be introduced in future releases alongside dedicated pipelines and security gates.
+::: info Investigation Scope vs. Change Packaging Scope
+Audit Mode investigates both **Setup Audit Trail** (`SetupAuditTrail`) and **Watched Objects** (`DataChange`) in one timeline. Compliance Change Log packaging (`Auditr_Change_Log__c` / `AuditrChangeLogBatch`) is scoped to **Setup Audit Trail** changes (`Source__c = 'SetupAuditTrail'`); Watched Object entries are labeled `Investigation Only` in the table.
 :::
 
 ---

@@ -37,6 +37,7 @@ const JOB_COLUMNS = [
 const RULE_COLUMNS = [
     { label: 'Priority', fieldName: 'priority', type: 'number', initialWidth: 95 },
     { label: 'Rule Label', fieldName: 'label', type: 'text' },
+    { label: 'Source', fieldName: 'source', type: 'text', initialWidth: 135 },
     { label: 'Target', fieldName: 'matchTarget', type: 'text', initialWidth: 135 },
     { label: 'Operator', fieldName: 'matchOperator', type: 'text', initialWidth: 120 },
     { label: 'Match Value', fieldName: 'matchValue', type: 'text' },
@@ -44,11 +45,22 @@ const RULE_COLUMNS = [
     { label: 'Risk Level', fieldName: 'riskLevel', type: 'text', initialWidth: 115 }
 ];
 
+const WATCHED_OBJECT_COLUMNS = [
+    { label: 'Object API Name', fieldName: 'objectApiName', type: 'text', initialWidth: 165 },
+    { label: 'History Table', fieldName: 'historyObjectName', type: 'text', initialWidth: 185 },
+    { label: 'State', fieldName: 'activeLabel', type: 'text', initialWidth: 105 },
+    { label: 'Readiness', fieldName: 'readinessLabel', type: 'text', initialWidth: 130 },
+    { label: 'Default Risk', fieldName: 'defaultRiskLevel', type: 'text', initialWidth: 115 },
+    { label: 'Watched Fields', fieldName: 'watchedFieldsDisplay', type: 'text', initialWidth: 200 },
+    { label: 'Status & Setup Guidance', fieldName: 'statusMessage', type: 'text', wrapText: true }
+];
+
 export default class AuditrControlCenter extends LightningElement {
     hourOptions = HOUR_OPTIONS;
     unclassifiedColumns = UNCLASSIFIED_COLUMNS;
     jobColumns = JOB_COLUMNS;
     ruleColumns = RULE_COLUMNS;
+    watchedObjectColumns = WATCHED_OBJECT_COLUMNS;
 
     status = {
         isActive: true,
@@ -76,7 +88,9 @@ export default class AuditrControlCenter extends LightningElement {
         healthWarning: null,
         recentJobs: [],
         activeRules: [],
-        topUnclassifiedActions: []
+        topUnclassifiedActions: [],
+        watchedObjectEntries: 0,
+        watchedObjects: []
     };
 
     selectedHour = '2';
@@ -157,6 +171,29 @@ export default class AuditrControlCenter extends LightningElement {
         return Array.isArray(this.status.recentJobs) && this.status.recentJobs.length > 0;
     }
 
+    get hasWatchedObjects() {
+        return Array.isArray(this.status.watchedObjects) && this.status.watchedObjects.length > 0;
+    }
+
+    get watchedObjectRows() {
+        return (this.status.watchedObjects || []).map((item) => ({
+            ...item,
+            historyObjectName: item.historyObjectName || '—',
+            activeLabel: item.isActive ? 'Active' : 'Inactive',
+            readinessLabel: item.isReady ? 'Ready' : 'Action Needed',
+            watchedFieldsDisplay:
+                Array.isArray(item.watchedFields) && item.watchedFields.length > 0
+                    ? item.watchedFields.join(', ')
+                    : 'All Tracked Fields'
+        }));
+    }
+
+    get watchedObjectsCardTitle() {
+        const count = this.watchedObjectRows.length;
+        const stored = this.status.watchedObjectEntries || 0;
+        return `Watched Objects Readiness (${count} configured • ${stored} entries stored)`;
+    }
+
     get filteredRules() {
         const rules = this.status.activeRules || [];
         const term = (this.ruleSearchTerm || '').trim().toLowerCase();
@@ -164,7 +201,7 @@ export default class AuditrControlCenter extends LightningElement {
             return rules;
         }
         return rules.filter((rule) =>
-            [rule.label, rule.matchTarget, rule.matchOperator, rule.matchValue, rule.category, rule.riskLevel]
+            [rule.label, rule.source, rule.matchTarget, rule.matchOperator, rule.matchValue, rule.category, rule.riskLevel]
                 .filter(Boolean)
                 .some((val) => val.toLowerCase().includes(term))
         );
