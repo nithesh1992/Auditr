@@ -5,6 +5,7 @@ import getAuditEntriesWithContinuation from '@salesforce/apex/AuditrChangeLogCon
 import searchDraftChangeLogs from '@salesforce/apex/AuditrChangeLogController.searchDraftChangeLogs';
 import createChangeLog from '@salesforce/apex/AuditrChangeLogController.createChangeLog';
 import packageEntries from '@salesforce/apex/AuditrChangeLogController.packageEntries';
+import packageFilteredEntries from '@salesforce/apex/AuditrChangeLogController.packageFilteredEntries';
 import resolveUser from '@salesforce/apex/AuditrChangeLogController.resolveUser';
 
 jest.mock(
@@ -64,6 +65,7 @@ jest.mock(
 const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 const ENTRY_ONE = {
+    source: 'SetupAuditTrail',
     recordId: 'a01000000000001AAA',
     name: 'AUD-0000001',
     occurredAt: '2026-10-31T15:00:00.000Z',
@@ -81,6 +83,7 @@ const ENTRY_ONE = {
 };
 
 const ENTRY_TWO = {
+    source: 'SetupAuditTrail',
     recordId: 'a01000000000002AAA',
     name: 'AUD-0000002',
     occurredAt: '2026-10-31T15:01:00.000Z',
@@ -376,5 +379,64 @@ describe('c-auditr-audit-mode', () => {
         expect(datatable.data[0].targetRecordLabel).toBe('Account (001000000000001AAA)');
         expect(datatable.data[0].delegateUser).toBe('admin@example.com (Inferred)');
         expect(datatable.data[0].changeRequestDisplay).toBe('Investigation Only');
+    });
+
+    it('excludes Watched Object rows from flat and burst packaging selections', async () => {
+        const watched = { ...ENTRY_TWO, source: 'DataChange', isPackaged: false };
+        const element = createElement('c-auditr-audit-mode', { is: AuditrAuditMode });
+        document.body.appendChild(element);
+        getAuditEntries.emit([ENTRY_ONE, watched]);
+        await flushPromises();
+
+        const datatable = element.shadowRoot.querySelector('lightning-datatable');
+        datatable.dispatchEvent(new CustomEvent('rowselection', { detail: { selectedRows: [watched] } }));
+        await flushPromises();
+        const packageButton = [...element.shadowRoot.querySelectorAll('lightning-button')]
+            .find((button) => button.label.startsWith('Package Selected'));
+        expect(packageButton.disabled).toBe(true);
+        expect(packageButton.label).toBe('Package Selected (0)');
+
+        const burstToggle = element.shadowRoot.querySelector('.burst-toggle-input');
+        burstToggle.checked = true;
+        burstToggle.dispatchEvent(new CustomEvent('change'));
+        await flushPromises();
+        const grid = element.shadowRoot.querySelector('lightning-tree-grid');
+        grid.dispatchEvent(new CustomEvent('rowselection', { detail: { selectedRows: [grid.data[0]] } }));
+        await flushPromises();
+        expect(packageButton.label).toBe('Package Selected (1)');
+        expect(grid.selectedRows).not.toContain(watched.recordId);
+    });
+
+    it('passes the applied high-risk filter when packaging all unassigned entries', async () => {
+        searchDraftChangeLogs.mockResolvedValue([DRAFT_LOG]);
+        packageFilteredEntries.mockResolvedValue('707000000000003AAA');
+        const element = createElement('c-auditr-audit-mode', { is: AuditrAuditMode });
+        document.body.appendChild(element);
+        getAuditEntries.emit([ENTRY_ONE]);
+        await flushPromises();
+
+        const toggle = [...element.shadowRoot.querySelectorAll('lightning-input')]
+            .find((input) => input.name === 'highRiskOnly');
+        toggle.checked = true;
+        toggle.dispatchEvent(new CustomEvent('change'));
+        [...element.shadowRoot.querySelectorAll('lightning-button')]
+            .find((button) => button.label === 'Apply Filters').click();
+        await flushPromises();
+        getAuditEntries.emit([ENTRY_ONE]);
+        await flushPromises();
+        [...element.shadowRoot.querySelectorAll('lightning-button')]
+            .find((button) => button.label.startsWith('Package All Unassigned')).click();
+        await flushPromises();
+        [...element.shadowRoot.querySelectorAll('lightning-button')]
+            .find((button) => button.label === 'Confirm & Package').click();
+        await flushPromises();
+
+        expect(packageFilteredEntries).toHaveBeenCalledWith({
+            changeLogId: DRAFT_LOG.recordId,
+            windowStart: expect.any(String),
+            windowEnd: expect.any(String),
+            actorUsername: '',
+            highRiskOnly: true
+        });
     });
 });

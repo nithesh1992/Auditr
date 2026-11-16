@@ -115,7 +115,7 @@ private class AuditrChangeLogControllerTest {
 
         System.runAs(new User(Id = UserInfo.getUserId())) {
             Test.startTest();
-            jobId = AuditrChangeLogController.packageFilteredEntries(changeLog.Id, null, null, null);
+            jobId = AuditrChangeLogController.packageFilteredEntries(changeLog.Id, null, null, null, false);
             Test.stopTest();
         }
 
@@ -258,7 +258,7 @@ private class AuditrChangeLogControllerTest {
             }
 
             try {
-                AuditrChangeLogController.packageFilteredEntries(draftLog.Id, System.now().addDays(-7), System.now(), null);
+                AuditrChangeLogController.packageFilteredEntries(draftLog.Id, System.now().addDays(-7), System.now(), null, false);
                 Assert.fail('packageFilteredEntries should have thrown AuraHandledException when admin permission is absent');
             } catch (AuraHandledException auraEx) {
                 Assert.isNotNull(auraEx.getMessage(), 'Exception message should not be null');
@@ -313,6 +313,78 @@ private class AuditrChangeLogControllerTest {
         Assert.isNotNull(actorEnvelope.totalMatchingCount, 'Actor matching count must be computed');
         Assert.isNotNull(highRiskEnvelope.totalMatchingCount, 'High risk matching count must be computed');
         Assert.isNotNull(actorHighRiskEnvelope.totalMatchingCount, 'Actor high risk matching count must be computed');
+    }
+
+    @IsTest
+    private static void shouldCountCitationsNotWatchedRows_WhenAllSourcesQueried() {
+        Auditr_Entry__c watched = AuditrTestDataFactory.buildEntry(99, null);
+        watched.Source__c = 'DataChange';
+        Database.insert(watched, AccessLevel.SYSTEM_MODE);
+
+        Test.startTest();
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO small =
+            AuditrChangeLogController.getAuditEntries(null, null, null, false, null);
+        AuditrChangeLogController.entryQueryLimit = 2;
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO paged =
+            AuditrChangeLogController.getAuditEntries(null, null, null, false, null);
+        Test.stopTest();
+
+        Assert.areEqual(5, small.totalMatchingCount, 'Both sources must be included');
+        Assert.areEqual(3, small.totalUnassignedCount, 'Only uncited Setup entries are eligible');
+        Assert.areEqual(1, small.totalPackagedCount, 'Only the seeded citation is packaged');
+        Assert.areEqual(small.totalPackagedCount, paged.totalPackagedCount, 'Count query must match the small-slice path');
+        Assert.areEqual(small.totalUnassignedCount, paged.totalUnassignedCount, 'Unassigned count must be consistent');
+    }
+
+    @IsTest
+    private static void shouldRejectWatchedSelection_WhenPackagingRequested() {
+        Auditr_Entry__c watched = AuditrTestDataFactory.buildEntry(99, null);
+        watched.Source__c = 'DataChange';
+        Database.insert(watched, AccessLevel.SYSTEM_MODE);
+        Id changeLogId = [SELECT Id FROM Auditr_Change_Log__c WITH SYSTEM_MODE LIMIT 1].Id;
+        Test.startTest();
+        try {
+            AuditrChangeLogController.packageEntries(changeLogId, new List<Id>{ watched.Id });
+            Assert.fail('Watched selections must not enqueue a no-op packaging job');
+        } catch (AuraHandledException ex) {
+            Assert.isTrue(ex.getMessage().contains('Setup Audit Trail'), 'Server must explain packaging eligibility');
+        }
+        Test.stopTest();
+        Assert.isNull([SELECT Packaging_Job_Id__c FROM Auditr_Change_Log__c WHERE Id = :changeLogId WITH SYSTEM_MODE].Packaging_Job_Id__c,
+            'A rejected selection must not claim a packaging job');
+    }
+
+    @IsTest
+    private static void shouldPackageOnlyHighRisk_WhenRiskFilterApplied() {
+        Auditr_Entry__c lowRisk = AuditrTestDataFactory.buildEntry(99, null);
+        lowRisk.Risk_Level__c = 'Low';
+        Database.insert(lowRisk, AccessLevel.SYSTEM_MODE);
+        Id changeLogId = [SELECT Id FROM Auditr_Change_Log__c WITH SYSTEM_MODE LIMIT 1].Id;
+
+        Test.startTest();
+        AuditrChangeLogController.packageFilteredEntries(changeLogId, null, null, null, true);
+        Test.stopTest();
+        Assert.areEqual(4, [SELECT COUNT() FROM Auditr_Change_Log_Item__c WHERE Change_Log__c = :changeLogId WITH SYSTEM_MODE],
+            'Only seeded High risk entries may be cited');
+        Assert.areEqual(0, [SELECT COUNT() FROM Auditr_Change_Log_Item__c WHERE Entry__c = :lowRisk.Id WITH SYSTEM_MODE],
+            'Low risk entry outside the applied scope must stay unassigned');
+    }
+
+    @IsTest
+    private static void shouldRejectSecondPackagingRequest_WhenJobIsQueued() {
+        Id changeLogId = [SELECT Id FROM Auditr_Change_Log__c WITH SYSTEM_MODE LIMIT 1].Id;
+        Id entryId = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE LIMIT 1].Id;
+        Test.startTest();
+        Id firstJob = AuditrChangeLogController.packageEntries(changeLogId, new List<Id>{ entryId });
+        try {
+            AuditrChangeLogController.packageEntries(changeLogId, new List<Id>{ entryId });
+            Assert.fail('Second request must not overwrite the active job pointer');
+        } catch (AuraHandledException ex) {
+            Assert.isNotNull(ex.getMessage(), 'An active-job error must be surfaced');
+        }
+        Assert.areEqual(firstJob, (Id) [SELECT Packaging_Job_Id__c FROM Auditr_Change_Log__c WHERE Id = :changeLogId WITH SYSTEM_MODE].Packaging_Job_Id__c,
+            'The original job must retain ownership');
+        Test.stopTest();
     }
 
     @IsTest

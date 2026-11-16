@@ -114,26 +114,24 @@ private class AuditrChangeLogBatchTest {
     }
 
     @IsTest
-    private static void shouldStampPackagingWarningAndThrow_WhenCitationsFail() {
+    private static void shouldCommitPackagingWarning_WhenAsyncFinishHasFailures() {
         Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
         changeLog.Description__c = 'Original approved change description.';
         Database.update(changeLog, AccessLevel.SYSTEM_MODE);
 
-        AuditrChangeLogBatch batch = new AuditrChangeLogBatch(changeLog.Id);
+        Auditr_Entry__c entry = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE LIMIT 1];
+        AuditrChangeLogBatch batch = new AuditrChangeLogBatch(changeLog.Id, new Set<Id>{ entry.Id });
         batch.totalFailedCitations = 2;
         batch.firstErrorMessage = 'Simulated citation insertion failure';
 
         Test.startTest();
-        AuditrChangeLogBatch.AuditrChangeLogBatchException caughtEx;
-        try {
-            batch.finish(null);
-        } catch (AuditrChangeLogBatch.AuditrChangeLogBatchException ex) {
-            caughtEx = ex;
-        }
+        Id jobId = Database.executeBatch(batch, 200);
+        changeLog.Packaging_Job_Id__c = String.valueOf(jobId);
+        Database.update(changeLog, AccessLevel.SYSTEM_MODE);
         Test.stopTest();
 
-        Assert.isNotNull(caughtEx, 'AuditrChangeLogBatchException must be thrown when totalFailedCitations > 0');
-        Assert.isTrue(caughtEx.getMessage().contains('2 failed citation'), 'Exception message should report failed citation count');
+        Assert.areEqual('Completed', [SELECT Status FROM AsyncApexJob WHERE Id = :jobId].Status,
+            'Partial citation failures must not roll back the final warning');
 
         Auditr_Change_Log__c updated = [
             SELECT Description__c, Packaging_Job_Id__c
@@ -148,5 +146,43 @@ private class AuditrChangeLogBatchTest {
             'Original description must be preserved after the warning header'
         );
         Assert.isNull(updated.Packaging_Job_Id__c, 'In-flight packaging job pointer must be cleared');
+    }
+
+    @IsTest
+    private static void shouldStampWarningDuringExecute_WhenOneCitationFails() {
+        Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
+        Auditr_Entry__c validEntry = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE LIMIT 1];
+        AuditrChangeLogBatch batch = new AuditrChangeLogBatch(changeLog.Id);
+
+        Test.startTest();
+        batch.execute(null, new List<SObject>{ validEntry, new User(Id = UserInfo.getUserId()) });
+        Test.stopTest();
+
+        Auditr_Change_Log__c updated = [
+            SELECT Description__c, Total_Entries__c FROM Auditr_Change_Log__c WHERE Id = :changeLog.Id WITH SYSTEM_MODE
+        ];
+        Assert.areEqual(1, batch.totalFailedCitations, 'Invalid lookup must be a row-level failure');
+        Assert.areEqual(1, updated.Total_Entries__c, 'Valid citation must survive');
+        Assert.isTrue(updated.Description__c.contains('[PACKAGING WARNING: 1 citation(s)'),
+            'The warning must exist before finish is called');
+    }
+
+    @IsTest
+    private static void shouldPreserveAnotherJobPointer_WhenEarlierBatchFinishes() {
+        Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
+        Auditr_Entry__c entry = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE LIMIT 1];
+        Set<Id> entryIds = new Set<Id>{ entry.Id };
+
+        Test.startTest();
+        Id ownerJob = Database.executeBatch(new AuditrChangeLogBatch(changeLog.Id, entryIds), 200);
+        System.abortJob(ownerJob);
+        changeLog.Packaging_Job_Id__c = String.valueOf(ownerJob);
+        Database.update(changeLog, AccessLevel.SYSTEM_MODE);
+        Database.executeBatch(new AuditrChangeLogBatch(changeLog.Id, entryIds), 200);
+        Test.stopTest();
+
+        Assert.areEqual(ownerJob, (Id) [
+            SELECT Packaging_Job_Id__c FROM Auditr_Change_Log__c WHERE Id = :changeLog.Id WITH SYSTEM_MODE
+        ].Packaging_Job_Id__c, 'A different batch must not clear the recorded job pointer');
     }
 }

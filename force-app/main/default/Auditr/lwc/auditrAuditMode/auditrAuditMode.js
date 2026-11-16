@@ -436,7 +436,7 @@ export default class AuditrAuditMode extends LightningElement {
 
     handleFlatRowSelection(event) {
         const selected = event.detail.selectedRows || [];
-        this.selectedEntryIds = selected.map((r) => r.recordId);
+        this.selectedEntryIds = this.packagableIds(selected.map((r) => r.recordId));
     }
 
     handleTreeRowSelection(event) {
@@ -453,8 +453,13 @@ export default class AuditrAuditMode extends LightningElement {
             }
         }
 
-        this.selectedEntryIds = Array.from(newSelectedEntryIds);
+        this.selectedEntryIds = this.packagableIds(Array.from(newSelectedEntryIds));
         this.syncGridSelectedRows();
+    }
+
+    packagableIds(ids) {
+        const eligible = new Set(this.entryRows.filter((row) => row.source === 'SetupAuditTrail').map((row) => row.recordId));
+        return ids.filter((id) => eligible.has(id));
     }
 
     syncGridSelectedRows() {
@@ -654,7 +659,8 @@ export default class AuditrAuditMode extends LightningElement {
                     changeLogId: targetLogId,
                     windowStart: this.windowStart,
                     windowEnd: this.windowEnd,
-                    actorUsername: this.actorUsername
+                    actorUsername: this.actorUsername,
+                    highRiskOnly: this.appliedHighRiskOnly
                 });
             }
 

@@ -93,13 +93,37 @@ public with sharing class AuditrLoginAsCorrelator {
         }
     }
 
-    private class RawSignal {
+    @TestVisible
+    private class RawSignal implements Comparable {
+        public String sourceId;
         public String actionCode;
         public Id createdById;
         public String createdByUsername;
         public String delegateUser;
         public String displayText;
         public DateTime occurredAt;
+
+        /**
+         * @description Sorts chronologically, with login before logout at the same timestamp.
+         * @param other Other RawSignal instance to compare against.
+         * @return Negative, zero, or positive ordering result.
+         */
+        public Integer compareTo(Object other) {
+            RawSignal right = (RawSignal) other;
+            if (occurredAt != right.occurredAt) {
+                if (occurredAt == null) {
+                    return -1;
+                }
+                return right.occurredAt == null || occurredAt > right.occurredAt ? 1 : -1;
+            }
+            Integer rankDifference = actionRank(actionCode) - actionRank(right.actionCode);
+            return rankDifference != 0 ? rankDifference : (sourceId ?? '').compareTo(right.sourceId ?? '');
+        }
+    }
+
+    private static Integer actionRank(String actionCode) {
+        String normalized = (actionCode ?? '').trim().toLowerCase();
+        return LOGIN_ACTIONS.contains(normalized) ? 0 : (LOGOUT_ACTIONS.contains(normalized) ? 2 : 1);
     }
 
     /**
@@ -130,7 +154,7 @@ public with sharing class AuditrLoginAsCorrelator {
     }
 
     /**
-     * @description Loads Login-As windows covering the bounded time range [earliest - 120m, latest + 5m].
+     * @description Loads Login-As windows using signals within [earliest - 120m, latest + 120m].
      * @param earliest Earliest history row timestamp in the chunk.
      * @param latest Latest history row timestamp in the chunk.
      * @return Ordered list of LoginAsWindow instances.
@@ -142,7 +166,8 @@ public with sharing class AuditrLoginAsCorrelator {
         DateTime anchorStart = (earliest != null) ? earliest : System.now();
         DateTime anchorEnd = (latest != null && latest >= anchorStart) ? latest : anchorStart;
         DateTime queryStart = anchorStart.addMinutes(-DEFAULT_LOGIN_AS_MAX_MINUTES);
-        DateTime queryEnd = anchorEnd.addMinutes(5);
+        // Logout-only signals can infer a window up to 120 minutes backwards.
+        DateTime queryEnd = anchorEnd.addMinutes(DEFAULT_LOGIN_AS_MAX_MINUTES);
 
         List<RawSignal> signals = collectSignals(queryStart, queryEnd);
         Map<String, User> usersByNameOrUsername = resolveDisplayTargetUsers(signals);
@@ -171,6 +196,7 @@ public with sharing class AuditrLoginAsCorrelator {
                 seenSourceIds.add(entry.Source_Record_Id__c);
             }
             RawSignal sig = new RawSignal();
+            sig.sourceId = entry.Source_Record_Id__c;
             sig.actionCode = entry.Action_Code__c;
             sig.createdById = entry.Actor__c;
             sig.createdByUsername = entry.Actor_Username__c;
@@ -194,6 +220,7 @@ public with sharing class AuditrLoginAsCorrelator {
                 continue;
             }
             RawSignal sig = new RawSignal();
+            sig.sourceId = String.valueOf(sat.Id);
             sig.actionCode = sat.Action;
             sig.createdById = sat.CreatedById;
             sig.createdByUsername = (sat.CreatedBy != null) ? sat.CreatedBy.Username : null;
@@ -233,6 +260,7 @@ public with sharing class AuditrLoginAsCorrelator {
         return byKey;
     }
 
+    @TestVisible
     private static List<LoginAsWindow> buildWindowsFromSignals(
         List<RawSignal> signals,
         Map<String, User> usersByNameOrUsername
@@ -240,6 +268,7 @@ public with sharing class AuditrLoginAsCorrelator {
         List<LoginAsWindow> windows = new List<LoginAsWindow>();
         Map<String, LoginAsWindow> openByActorKey = new Map<String, LoginAsWindow>();
 
+        signals.sort();
         for (RawSignal sig : signals) {
             ResolvedParticipants participants = resolveParticipants(sig, usersByNameOrUsername);
             if (participants == null) {

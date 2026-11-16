@@ -246,6 +246,7 @@ public with sharing class AuditrChangeLogController {
 
         List<AuditEntryDTO> rows = new List<AuditEntryDTO>();
         Integer unassignedInSlice = 0;
+        Integer packagedInSlice = 0;
         for (Auditr_Entry__c entry : entries) {
             AuditEntryDTO dto = new AuditEntryDTO();
             dto.recordId = entry.Id;
@@ -263,6 +264,7 @@ public with sharing class AuditrChangeLogController {
             dto.displayText = entry.Display__c;
             if (!entry.Auditr_Change_Log_Items__r.isEmpty()) {
                 dto.isPackaged = true;
+                packagedInSlice++;
                 dto.changeLogId = entry.Auditr_Change_Log_Items__r[0].Change_Log__c;
                 dto.changeLogName = entry.Auditr_Change_Log_Items__r[0].Change_Log__r.Name;
                 dto.changeRequestId = entry.Auditr_Change_Log_Items__r[0].Change_Log__r.Change_Request_Id__c;
@@ -271,7 +273,7 @@ public with sharing class AuditrChangeLogController {
                 dto.changeLogId = null;
                 dto.changeLogName = null;
                 dto.changeRequestId = null;
-                if (entry.Source__c == null || entry.Source__c == AuditrUtil.DEFAULT_SOURCE) {
+                if (entry.Source__c == AuditrUtil.DEFAULT_SOURCE) {
                     unassignedInSlice++;
                 }
             }
@@ -294,20 +296,16 @@ public with sharing class AuditrChangeLogController {
         if (continuationOccurredAt == null && entries.size() < entryQueryLimit) {
             envelope.totalMatchingCount = entries.size();
             envelope.totalUnassignedCount = unassignedInSlice;
-            envelope.totalPackagedCount = (normalizedSource != null && normalizedSource != AuditrUtil.DEFAULT_SOURCE)
-                ? 0
-                : (entries.size() - unassignedInSlice);
+            envelope.totalPackagedCount = packagedInSlice;
             envelope.isCapped = false;
         } else if (continuationOccurredAt == null) {
-            Integer totalMatches = countMatchingEntries(effectiveStart, effectiveEnd, actor, allowedRisks, normalizedSource);
+            Integer totalMatches = countMatchingEntries(effectiveStart, effectiveEnd, actor, allowedRisks, normalizedSource, false);
             Integer totalUnassigned = (normalizedSource != null && normalizedSource != AuditrUtil.DEFAULT_SOURCE)
                 ? 0
                 : countUnassignedEntries(effectiveStart, effectiveEnd, actor, allowedRisks);
             envelope.totalMatchingCount = totalMatches;
             envelope.totalUnassignedCount = totalUnassigned;
-            envelope.totalPackagedCount = (normalizedSource != null && normalizedSource != AuditrUtil.DEFAULT_SOURCE)
-                ? 0
-                : Math.max(0, totalMatches - totalUnassigned);
+            envelope.totalPackagedCount = countMatchingEntries(effectiveStart, effectiveEnd, actor, allowedRisks, normalizedSource, true);
             envelope.isCapped = (totalMatches >= BACKLOG_COUNT_CAP);
         }
 
@@ -409,7 +407,15 @@ public with sharing class AuditrChangeLogController {
             throw createAuraException('Select at least one audit entry to package.');
         }
         Auditr_Change_Log__c targetLog = validatePackagingTarget(changeLogId);
-        Id jobId = Database.executeBatch(new AuditrChangeLogBatch(targetLog.Id, new Set<Id>(entryIds)), AuditrUtil.getBatchSize());
+        Set<Id> selection = new Set<Id>(entryIds);
+        Integer eligibleCount = [
+            SELECT COUNT() FROM Auditr_Entry__c
+            WHERE Id IN :selection AND Source__c = :AuditrUtil.DEFAULT_SOURCE WITH USER_MODE
+        ];
+        if (eligibleCount != selection.size()) {
+            throw createAuraException('Only accessible Setup Audit Trail entries can be packaged. Watched Object entries are investigation only.');
+        }
+        Id jobId = Database.executeBatch(new AuditrChangeLogBatch(targetLog.Id, selection), AuditrUtil.getBatchSize());
         stampPackagingJob(targetLog.Id, jobId);
         return jobId;
     }
@@ -421,11 +427,12 @@ public with sharing class AuditrChangeLogController {
      * @param windowStart Inclusive Occurred_At__c lower bound (defaults to System.now() - 30 days).
      * @param windowEnd Inclusive Occurred_At__c upper bound (defaults to System.now()).
      * @param actorUsername Optional exact Responsible_Username__c filter (blank for all actors).
+     * @param highRiskOnly Restrict packaging to High and Critical risk entries.
      * @return AsyncApexJob Id of the queued AuditrChangeLogBatch.
      */
     @AuraEnabled
     @SuppressWarnings('PMD.ExcessiveParameterList')
-    public static Id packageFilteredEntries(Id changeLogId, DateTime windowStart, DateTime windowEnd, String actorUsername) {
+    public static Id packageFilteredEntries(Id changeLogId, DateTime windowStart, DateTime windowEnd, String actorUsername, Boolean highRiskOnly) {
         Auditr_Change_Log__c targetLog = validatePackagingTarget(changeLogId);
         targetLog.Window_Start__c = resolveWindowStart(windowStart);
         targetLog.Window_End__c = resolveWindowEnd(windowEnd);
@@ -435,7 +442,7 @@ public with sharing class AuditrChangeLogController {
         } catch (DmlException dmlError) {
             throw createAuraException(dmlError.getDmlMessage(0));
         }
-        Id jobId = Database.executeBatch(new AuditrChangeLogBatch(targetLog.Id), AuditrUtil.getBatchSize());
+        Id jobId = Database.executeBatch(new AuditrChangeLogBatch(targetLog.Id, null, highRiskOnly), AuditrUtil.getBatchSize());
         stampPackagingJob(targetLog.Id, jobId);
         return jobId;
     }
@@ -502,7 +509,7 @@ public with sharing class AuditrChangeLogController {
         }
         List<Auditr_Change_Log__c> logs = [
             SELECT Id, Status__c, Packaging_Job_Id__c
-            FROM Auditr_Change_Log__c WHERE Id = :changeLogId WITH USER_MODE LIMIT 1
+            FROM Auditr_Change_Log__c WHERE Id = :changeLogId WITH USER_MODE LIMIT 1 FOR UPDATE
         ];
         if (logs.isEmpty()) {
             throw createAuraException('Change log not found or not accessible.');
@@ -581,9 +588,13 @@ public with sharing class AuditrChangeLogController {
         DateTime effectiveEnd,
         String actor,
         List<String> allowedRisks,
-        String normalizedSource
+        String normalizedSource,
+        Boolean packagedOnly
     ) {
         String query = 'SELECT COUNT() FROM Auditr_Entry__c WHERE Occurred_At__c >= :effectiveStart AND Occurred_At__c <= :effectiveEnd ';
+        if (packagedOnly) {
+            query += 'AND Id IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL) ';
+        }
         Map<String, Object> binds = new Map<String, Object>{
             'effectiveStart' => effectiveStart,
             'effectiveEnd' => effectiveEnd,
@@ -644,7 +655,7 @@ public with sharing class AuditrChangeLogController {
     private static void stampPackagingJob(Id changeLogId, Id jobId) {
         Database.update(
             new Auditr_Change_Log__c(Id = changeLogId, Packaging_Job_Id__c = String.valueOf(jobId)),
-            false,
+            true,
             AccessLevel.SYSTEM_MODE
         );
     }

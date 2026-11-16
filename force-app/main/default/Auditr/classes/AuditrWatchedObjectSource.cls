@@ -27,6 +27,7 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
 
     @TestVisible private static List<Auditr_Watched_Object__mdt> testWatchedObjectsOverride;
     @TestVisible private static Map<String, Set<String>> testTrackedFieldsOverride;
+    private static List<Auditr_Watched_Object__mdt> cachedRegistry;
 
     private Auditr_Watched_Object__mdt watchedConfig;
     private String objectApiName;
@@ -262,7 +263,7 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
     /**
      * @description Converts a chunk of <Object>History SObject rows into grouped Auditr_Entry__c records.
      * @param rows History SObject rows ordered by CreatedDate ASC, Id ASC.
-     * @return Completed Auditr_Entry__c records (the trailing open group stays buffered until the next chunk or flush).
+     * @return Completed Auditr_Entry__c records (the trailing group is flushed by execute before it commits).
      */
     public override List<Auditr_Entry__c> toEntries(List<SObject> rows) {
         if (rows == null || rows.isEmpty()) {
@@ -309,7 +310,7 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
     }
 
     /**
-     * @description Emits the trailing open group after the final batch chunk.
+     * @description Emits the trailing open group and clears chunk-local state before execute commits.
      * @return Zero or one Auditr_Entry__c record.
      */
     public override List<Auditr_Entry__c> flush() {
@@ -319,6 +320,7 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
             pendingGroup = null;
         }
         currentRunAnchor = null;
+        cachedLoginAsWindows = null;
         return emitted;
     }
 
@@ -349,16 +351,21 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
             if (record.Is_Active__c != true || String.isBlank(record.Object_API_Name__c)) {
                 continue;
             }
-            AuditrWatchedObjectSource adapter = new AuditrWatchedObjectSource(record);
-            if (String.isBlank(adapter.historyObjectName)) {
-                System.debug(
-                    LoggingLevel.ERROR,
-                    'Auditr_Watched_Object__mdt.' + record.DeveloperName + ' skipped: Field History table for ' +
-                    record.Object_API_Name__c + ' is not available.'
-                );
-                continue;
+            try {
+                AuditrWatchedObjectSource adapter = new AuditrWatchedObjectSource(record);
+                if (String.isBlank(adapter.historyObjectName)) {
+                    System.debug(
+                        LoggingLevel.ERROR,
+                        'Auditr_Watched_Object__mdt.' + record.DeveloperName + ' skipped: Field History table for ' +
+                        record.Object_API_Name__c + ' is not available.'
+                    );
+                    continue;
+                }
+                adapters.add(adapter);
+            } catch (Exception ex) {
+                System.debug(LoggingLevel.ERROR, 'Auditr_Watched_Object__mdt.' + record.DeveloperName +
+                    ' could not be configured: ' + ex.getMessage());
             }
-            adapters.add(adapter);
         }
         return adapters;
     }
@@ -616,11 +623,8 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
     }
 
     private void ensureLoginAsWindowsLoaded(List<HistoryRowInput> inputs) {
-        if (cachedLoginAsWindows != null) {
-            return;
-        }
-        DateTime earliest = null;
-        DateTime latest = null;
+        DateTime earliest = pendingGroup?.occurredAt;
+        DateTime latest = earliest;
         for (HistoryRowInput input : inputs) {
             if (input == null || input.occurredAt == null) {
                 continue;
@@ -830,15 +834,27 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
         return trackedByObj;
     }
 
+    @TestVisible
+    private static List<Auditr_Watched_Object__mdt> queryWatchedRegistry() {
+        return [
+            SELECT DeveloperName, MasterLabel, Object_API_Name__c, Is_Active__c,
+                   Watched_Fields__c, Default_Risk_Level__c, Category__c, Overlap_Hours__c, Batch_Size__c
+            FROM Auditr_Watched_Object__mdt WITH SYSTEM_MODE ORDER BY DeveloperName LIMIT 200
+        ];
+    }
+
     private static List<Auditr_Watched_Object__mdt> getWatchedRegistry() {
-        List<Auditr_Watched_Object__mdt> records;
-        if (testWatchedObjectsOverride != null) {
-            records = testWatchedObjectsOverride.clone();
-        } else if (Test.isRunningTest()) {
-            records = new List<Auditr_Watched_Object__mdt>();
-        } else {
-            records = Auditr_Watched_Object__mdt.getAll().values();
+        if (testWatchedObjectsOverride == null) {
+            if (Test.isRunningTest()) {
+                return new List<Auditr_Watched_Object__mdt>();
+            }
+            if (cachedRegistry == null) {
+                // Org-wide job configuration, including the complete long-text field list.
+                cachedRegistry = queryWatchedRegistry();
+            }
+            return cachedRegistry;
         }
+        List<Auditr_Watched_Object__mdt> records = testWatchedObjectsOverride.clone();
         List<String> names = new List<String>();
         Map<String, Auditr_Watched_Object__mdt> byName = new Map<String, Auditr_Watched_Object__mdt>();
         for (Auditr_Watched_Object__mdt record : records) {

@@ -45,7 +45,7 @@ The **Auditr Control Center** tab gives administrators complete visibility and c
 ### Operational Summary Cards
 
 - **Ingestion Engine**: Shows whether `Auditr_Setting__mdt.Is_Active__c` is `Active` or `Paused`, along with configured `Backfill_Days__c` and `Batch_Size__c`.
-- **Last Sync Job & Entry Age**: Displays the status and completed timestamp of the last `AsyncApexJob` for `AuditrSyncBatch` alongside the age of the newest `Auditr_Entry__c.Occurred_At__c` (since `allOrNone=false` batch runs can finish as `Completed` even if individual rows fail).
+- **Last Sync Job & Entry Age**: Displays the newest sync job and Setup entry watermark. A separate health check flags any failed, aborted, or error-reporting source sync in the last 36 hours, even outside the ten displayed jobs. This rolling warning is deliberately conservative; a subsequent successful source does not hide an earlier failure.
 - **Daily Sync Schedule**: Displays whether `Auditr_Daily_Sync` is `Scheduled` or `Not Scheduled` and shows the next scheduled fire timestamp.
 - **Retention Policy**: Schedule-aware status indicator:
   - `Retain Indefinitely (Purge Off)` when `Enable_Purge__c` is `false`.

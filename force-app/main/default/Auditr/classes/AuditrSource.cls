@@ -9,6 +9,7 @@ public with sharing abstract class AuditrSource {
     public static final Integer MAX_CONCURRENT_SOURCES = 25;
 
     @TestVisible private static List<Auditr_Source__mdt> testSourcesOverride;
+    private static List<Auditr_Source__mdt> cachedRegistry;
 
     /** @description Registry record backing this adapter instance (null when constructed directly). */
     protected Auditr_Source__mdt config;
@@ -36,14 +37,14 @@ public with sharing abstract class AuditrSource {
 
     /**
      * @description Maps a chunk of source rows to unsaved Auditr_Entry__c records with a unique Source_Record_Id__c.
-     * Adapters that group rows may hold an open group in instance state and emit it later.
+     * Adapters that group rows may buffer a trailing group until flush() at the end of the same chunk.
      * @param rows Chunk of source rows returned by the query locator.
      * @return Entries to insert (duplicates are removed by the caller).
      */
     public abstract List<Auditr_Entry__c> toEntries(List<SObject> rows);
 
     /**
-     * @description Emits entries still held in adapter state after the last chunk. Default: none.
+     * @description Emits entries still held in adapter state at the end of each execute chunk. Default: none.
      * @return Remaining entries to insert.
      */
     public virtual List<Auditr_Entry__c> flush() {
@@ -115,9 +116,14 @@ public with sharing abstract class AuditrSource {
             if (record.Is_Active__c != true) {
                 continue;
             }
-            AuditrSource adapter = instantiate(record);
-            if (adapter != null) {
-                adapters.add(adapter);
+            try {
+                AuditrSource adapter = instantiate(record);
+                if (adapter != null) {
+                    adapters.add(adapter);
+                }
+            } catch (Exception ex) {
+                System.debug(LoggingLevel.ERROR, 'Auditr_Source__mdt.' + record.DeveloperName +
+                    ' could not be configured: ' + ex.getMessage());
             }
         }
         for (AuditrSource watchedAdapter : AuditrWatchedObjectSource.loadActiveWatchedObjects()) {
@@ -174,9 +180,18 @@ public with sharing abstract class AuditrSource {
     }
 
     private static List<Auditr_Source__mdt> getRegistry() {
-        List<Auditr_Source__mdt> records = (testSourcesOverride != null)
-            ? testSourcesOverride.clone()
-            : Auditr_Source__mdt.getAll().values();
+        if (testSourcesOverride == null) {
+            if (cachedRegistry == null) {
+                // Job configuration is org-wide; SOQL avoids getAll()'s long-text truncation.
+                cachedRegistry = [
+                    SELECT DeveloperName, MasterLabel, Adapter_Class__c, Is_Active__c,
+                           Overlap_Hours__c, Batch_Size__c, Options__c
+                    FROM Auditr_Source__mdt WITH SYSTEM_MODE ORDER BY DeveloperName LIMIT 200
+                ];
+            }
+            return cachedRegistry;
+        }
+        List<Auditr_Source__mdt> records = testSourcesOverride.clone();
         List<String> names = new List<String>();
         Map<String, Auditr_Source__mdt> byName = new Map<String, Auditr_Source__mdt>();
         for (Auditr_Source__mdt record : records) {

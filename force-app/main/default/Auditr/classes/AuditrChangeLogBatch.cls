@@ -7,6 +7,7 @@
 public with sharing class AuditrChangeLogBatch implements Database.Batchable<SObject>, Database.Stateful {
     private final Id changeLogId;
     private final Set<Id> selectedEntryIds;
+    private Boolean highRiskOnly = false;
 
     @TestVisible private Integer totalAttempted = 0;
     @TestVisible private Integer totalCitationsInserted = 0;
@@ -35,6 +36,18 @@ public with sharing class AuditrChangeLogBatch implements Database.Batchable<SOb
     }
 
     /**
+     * @description Captures the risk filter in the queued job, independently of later UI changes.
+     * @param changeLogId Draft change log.
+     * @param selectedEntryIds Explicit selection, or null for filter-driven packaging.
+     * @param highRiskOnly Restrict filter-driven packaging to High and Critical entries.
+     */
+    @SuppressWarnings('PMD.AvoidBooleanMethodParameters')
+    public AuditrChangeLogBatch(Id changeLogId, Set<Id> selectedEntryIds, Boolean highRiskOnly) {
+        this(changeLogId, selectedEntryIds);
+        this.highRiskOnly = highRiskOnly == true;
+    }
+
+    /**
      * @description Builds the entry scope: explicit Ids or the target log's stored window/actor filter.
      * @param context BatchableContext provided by the platform.
      * @return Database.QueryLocator over Auditr_Entry__c ordered chronologically.
@@ -53,23 +66,22 @@ public with sharing class AuditrChangeLogBatch implements Database.Batchable<SOb
         String actor = String.isBlank(targetLog.Target_Actor__c) ? null : targetLog.Target_Actor__c;
         DateTime windowStart = targetLog.Window_Start__c;
         DateTime windowEnd = targetLog.Window_End__c;
-        if (actor == null) {
-            return Database.getQueryLocator([
-                SELECT Id FROM Auditr_Entry__c
-                WHERE Occurred_At__c >= :windowStart AND Occurred_At__c <= :windowEnd
-                    AND Source__c = :setupSource
-                    AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
-                WITH SYSTEM_MODE ORDER BY Occurred_At__c ASC
-            ]);
+        String query = 'SELECT Id FROM Auditr_Entry__c ' +
+            'WHERE Occurred_At__c >= :windowStart AND Occurred_At__c <= :windowEnd ' +
+            'AND Source__c = :setupSource ' +
+            'AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL) ';
+        Map<String, Object> binds = new Map<String, Object>{
+            'windowStart' => windowStart, 'windowEnd' => windowEnd, 'setupSource' => setupSource
+        };
+        if (actor != null) {
+            query += 'AND Responsible_Username__c = :actor ';
+            binds.put('actor', actor);
         }
-        return Database.getQueryLocator([
-            SELECT Id FROM Auditr_Entry__c
-            WHERE Occurred_At__c >= :windowStart AND Occurred_At__c <= :windowEnd
-                AND Source__c = :setupSource
-                AND Responsible_Username__c = :actor
-                AND Id NOT IN (SELECT Entry__c FROM Auditr_Change_Log_Item__c WHERE Entry__c != NULL)
-            WITH SYSTEM_MODE ORDER BY Occurred_At__c ASC
-        ]);
+        if (highRiskOnly) {
+            query += 'AND Risk_Level__c IN :risks ';
+            binds.put('risks', new Set<String>{ 'High', 'Critical' });
+        }
+        return Database.getQueryLocatorWithBinds(query + 'ORDER BY Occurred_At__c ASC', binds, AccessLevel.SYSTEM_MODE);
     }
 
     /**
@@ -96,66 +108,88 @@ public with sharing class AuditrChangeLogBatch implements Database.Batchable<SOb
         if (newItems.isEmpty()) {
             return;
         }
+        Integer failuresBeforeChunk = totalFailedCitations;
         Database.SaveResult[] saveResults = Database.insert(newItems, false, AccessLevel.SYSTEM_MODE);
-        for (Integer i = 0; i < saveResults.size(); i++) {
-            Database.SaveResult sr = saveResults[i];
-            totalAttempted++;
-            if (sr.isSuccess()) {
-                totalCitationsInserted++;
-            } else {
-                totalFailedCitations++;
-                for (Database.Error err : sr.getErrors()) {
-                    if (firstErrorMessage == null) {
-                        firstErrorMessage = err.getMessage();
-                    }
-                    System.debug(
-                        LoggingLevel.ERROR,
-                        'AuditrChangeLogBatch failed to cite entry ' + newItems[i].Entry__c + ': ' + err.getMessage()
-                    );
-                }
-            }
+        recordCitationResults(saveResults, newItems);
+        if (totalFailedCitations > failuresBeforeChunk) {
+            stampWarning(targetLog, failureSummary());
+            Database.update(targetLog, true, AccessLevel.SYSTEM_MODE);
         }
     }
 
     /**
      * @description Clears the in-flight Packaging_Job_Id__c on Draft logs when batch execution completes.
      * If citations failed to insert, stamps a persistent packaging warning on the change log's Description__c
-     * and throws AuditrChangeLogBatchException so the async job status reflects the failure.
+     * without throwing after DML. Row failures are represented by the committed warning, not job status.
      * @param context BatchableContext provided by the platform.
      */
     public void finish(Database.BatchableContext context) {
         Auditr_Change_Log__c targetLog = queryChangeLog();
-        if (targetLog.Status__c == AuditrChangeLogTriggerHandler.STATUS_DRAFT) {
-            String updatedDescription = targetLog.Description__c;
-            if (totalFailedCitations > 0) {
-                String warningHeader = '[PACKAGING WARNING: ' + totalFailedCitations +
-                    ' citation(s) failed to insert. First error: ' + firstErrorMessage + ']';
-                updatedDescription = String.isBlank(updatedDescription)
-                    ? warningHeader
-                    : (warningHeader + '\n\n' + updatedDescription);
-            }
-            Database.update(
-                new Auditr_Change_Log__c(
-                    Id = changeLogId,
-                    Packaging_Job_Id__c = null,
-                    Description__c = (updatedDescription == null) ? null : updatedDescription.left(32768)
-                ),
-                false,
-                AccessLevel.SYSTEM_MODE
-            );
+        if (targetLog.Status__c != AuditrChangeLogTriggerHandler.STATUS_DRAFT) {
+            return;
         }
         if (totalFailedCitations > 0) {
-            throw new AuditrChangeLogBatchException(
-                'AuditrChangeLogBatch encountered ' + totalFailedCitations +
-                ' failed citations during packaging. First error: ' + firstErrorMessage
+            stampWarning(targetLog, failureSummary());
+        }
+        finalizeContextState(targetLog, context);
+        Database.update(targetLog, true, AccessLevel.SYSTEM_MODE);
+    }
+
+    private void recordCitationResults(Database.SaveResult[] saveResults, List<Auditr_Change_Log_Item__c> newItems) {
+        for (Integer i = 0; i < saveResults.size(); i++) {
+            Database.SaveResult sr = saveResults[i];
+            totalAttempted++;
+            if (sr.isSuccess()) {
+                totalCitationsInserted++;
+                continue;
+            }
+            totalFailedCitations++;
+            recordCitationErrors(sr.getErrors(), newItems[i].Entry__c);
+        }
+    }
+
+    private void recordCitationErrors(List<Database.Error> errors, Id entryId) {
+        for (Database.Error err : errors) {
+            if (firstErrorMessage == null) {
+                firstErrorMessage = err.getMessage();
+            }
+            System.debug(
+                LoggingLevel.ERROR,
+                'AuditrChangeLogBatch failed to cite entry ' + entryId + ': ' + err.getMessage()
             );
+        }
+    }
+
+    private static void finalizeContextState(Auditr_Change_Log__c targetLog, Database.BatchableContext context) {
+        if (context == null) {
+            return;
+        }
+        AsyncApexJob job = [SELECT NumberOfErrors FROM AsyncApexJob WHERE Id = :context.getJobId() WITH SYSTEM_MODE];
+        if (job.NumberOfErrors > 0) {
+            stampWarning(targetLog, job.NumberOfErrors + ' batch transaction(s) failed. Review the packaging job.');
+        }
+        if (String.isNotBlank(targetLog.Packaging_Job_Id__c)
+            && (Id) targetLog.Packaging_Job_Id__c == context.getJobId()) {
+            targetLog.Packaging_Job_Id__c = null;
+        }
+    }
+
+    private String failureSummary() {
+        return totalFailedCitations + ' citation(s) failed to insert. First error: ' + firstErrorMessage;
+    }
+
+    private static void stampWarning(Auditr_Change_Log__c targetLog, String summary) {
+        String warning = '[PACKAGING WARNING: ' + summary + ']';
+        if (targetLog.Description__c == null || !targetLog.Description__c.contains(warning)) {
+            targetLog.Description__c = (warning + '\n\n' + (targetLog.Description__c ?? ''))
+                .left(Auditr_Change_Log__c.Description__c.getDescribe().getLength());
         }
     }
 
     private Auditr_Change_Log__c queryChangeLog() {
         List<Auditr_Change_Log__c> logs = [
-            SELECT Id, Status__c, Target_Actor__c, Window_Start__c, Window_End__c, Description__c
-            FROM Auditr_Change_Log__c WHERE Id = :changeLogId WITH SYSTEM_MODE LIMIT 1
+            SELECT Id, Status__c, Target_Actor__c, Window_Start__c, Window_End__c, Description__c, Packaging_Job_Id__c
+            FROM Auditr_Change_Log__c WHERE Id = :changeLogId WITH SYSTEM_MODE LIMIT 1 FOR UPDATE
         ];
         return logs.isEmpty() ? new Auditr_Change_Log__c() : logs[0];
     }

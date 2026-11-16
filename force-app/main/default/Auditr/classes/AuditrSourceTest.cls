@@ -7,6 +7,22 @@
 private class AuditrSourceTest {
     private static final String FAKE_SOURCE = 'LoginHistory';
 
+    /** @description Test adapter whose configure() method throws to verify fault isolation. */
+    public class BrokenConfigSource extends AuditrSource {
+        public override void configure(Auditr_Source__mdt config) {
+            throw new AuditrSyncBatch.AuditrSyncException('Invalid adapter configuration');
+        }
+        public override String sourceKey() {
+            return FAKE_SOURCE;
+        }
+        public override Database.QueryLocator getQueryLocator(DateTime cutoff) {
+            return Database.getQueryLocator([SELECT Id FROM User WHERE Id = NULL WITH SYSTEM_MODE]);
+        }
+        public override List<Auditr_Entry__c> toEntries(List<SObject> rows) {
+            return new List<Auditr_Entry__c>();
+        }
+    }
+
     /** @description Test adapter emitting one entry per row and one trailing entry from flush(). */
     private class FakeSource extends AuditrSource {
         private final String flushActionCode;
@@ -104,6 +120,27 @@ private class AuditrSourceTest {
     }
 
     @IsTest
+    private static void shouldKeepHealthyAdapters_WhenConfigurationThrows() {
+        Auditr_Source__mdt broken = buildRegistryRecord('A_Broken', 'AuditrSourceTest.BrokenConfigSource', true);
+        AuditrSource.testSourcesOverride = new List<Auditr_Source__mdt>{
+            broken, buildRegistryRecord('B_Healthy', 'AuditrSetupAuditTrailSource', true)
+        };
+        AuditrWatchedObjectSource.testWatchedObjectsOverride = new List<Auditr_Watched_Object__mdt>();
+        Test.startTest();
+        try {
+            AuditrSource.instantiate(broken);
+            Assert.fail('The fixture must exercise a throwing configure method');
+        } catch (AuditrSyncBatch.AuditrSyncException ex) {
+            Assert.isTrue(ex.getMessage().contains('Invalid adapter'), 'Expected the fixture configuration error');
+        }
+        List<AuditrSource> adapters = AuditrSource.loadActiveSources();
+        Test.stopTest();
+        Assert.areEqual(1, adapters.size(), 'The healthy adapter must still load after the broken one');
+        Assert.areEqual(AuditrUtil.DEFAULT_SOURCE, adapters[0].sourceKey(), 'Remaining source must be Setup Audit Trail');
+        Assert.isNotNull(AuditrWatchedObjectSource.queryWatchedRegistry(), 'Watched object SOQL registry query should execute cleanly');
+    }
+
+    @IsTest
     private static void shouldResolveWatermarkPerSource_WhenEntriesExistForThatSource() {
         DateTime lastOccurred = System.now().addHours(-10);
         Auditr_Entry__c existing = buildFakeEntry('FAKE-EXISTING', 'fakelogin');
@@ -173,6 +210,7 @@ private class AuditrSourceTest {
         AuditrSyncBatch batch = new AuditrSyncBatch(new FakeSource('a'.repeat(200)));
 
         Test.startTest();
+        batch.execute(null, [SELECT Id FROM User WHERE Id = :UserInfo.getUserId() WITH SYSTEM_MODE]);
         AuditrSyncBatch.AuditrSyncException caughtEx;
         try {
             batch.finish(null);
@@ -183,6 +221,27 @@ private class AuditrSourceTest {
 
         Assert.isNotNull(caughtEx, 'finish() must fail the job when a flushed entry fails to insert');
         Assert.isTrue(caughtEx.getMessage().contains('[' + FAKE_SOURCE + ']'), 'Failure message should name the source');
+    }
+
+    @IsTest
+    private static void shouldCommitFlushedEntry_WhenPriorChunkFailed() {
+        AuditrSyncBatch batch = new AuditrSyncBatch(new FakeSource('fakelogin'));
+        batch.totalFailedInserts = 1;
+        batch.firstInsertErrorMessage = 'Prior chunk failed';
+        Test.startTest();
+        batch.execute(null, [SELECT Id FROM User WHERE Id = :UserInfo.getUserId() WITH SYSTEM_MODE]);
+        Assert.areEqual(1, [SELECT COUNT() FROM Auditr_Entry__c WHERE Source_Record_Id__c = 'FAKE-FLUSH' WITH SYSTEM_MODE],
+            'The trailing entry must be written during execute, not finish');
+        Savepoint beforeFinish = Database.setSavepoint();
+        try {
+            batch.finish(null);
+            Assert.fail('The job must still report the earlier failure');
+        } catch (AuditrSyncBatch.AuditrSyncException ex) {
+            Database.rollback(beforeFinish);
+        }
+        Test.stopTest();
+        Assert.areEqual(1, [SELECT COUNT() FROM Auditr_Entry__c WHERE Source_Record_Id__c = 'FAKE-FLUSH' WITH SYSTEM_MODE],
+            'Rolling back finish must not discard the execute flush');
     }
 
     @IsTest
@@ -247,20 +306,23 @@ private class AuditrSourceTest {
         Test.startTest();
         List<Auditr_Entry__c> emitted = new List<Auditr_Entry__c>();
         emitted.addAll(adapter.processHistoryInputs(chunk1));
+        emitted.addAll(adapter.flush());
         emitted.addAll(adapter.processHistoryInputs(chunk2));
         emitted.addAll(adapter.flush());
         Test.stopTest();
 
-        Assert.areEqual(5, emitted.size(), 'Should emit 5 entries: save1, interruption by userB, post-interruption save by userA, cross-chunk t2 save, and record creation');
+        Assert.areEqual(6, emitted.size(), 'A save crossing a chunk boundary is emitted as two groups');
         Assert.areEqual('017000000000001AAA', emitted[0].Source_Record_Id__c, 'First group should use first history row Id');
         Assert.areEqual('fields_changed:2', emitted[0].Action_Code__c, 'Duplicate Rating and unwatched BillingCity should leave 2 watched fields');
         Assert.isTrue(emitted[0].Display__c.contains('Changed OwnerId, Rating on Account'), 'Display should list watched fields only');
         Assert.areEqual('017000000000005AAA', emitted[1].Source_Record_Id__c, 'Second entry should be userB interruption');
         Assert.areEqual('017000000000006AAA', emitted[2].Source_Record_Id__c, 'Third entry should be userA post-interruption (not merged with first)');
         Assert.areEqual('field_changed:Type', emitted[2].Action_Code__c, 'Single field change should use field_changed:<field>');
-        Assert.areEqual('017000000000007AAA', emitted[3].Source_Record_Id__c, 'Fourth entry should merge across chunk1 and chunk2 at t2');
-        Assert.areEqual('fields_changed:2', emitted[3].Action_Code__c, 'Cross-chunk save should contain 2 fields');
-        Assert.areEqual('record_created', emitted[4].Action_Code__c, 'created field should produce record_created action');
+        Assert.areEqual('017000000000007AAA', emitted[3].Source_Record_Id__c, 'First chunk anchors its final group');
+        Assert.areEqual('field_changed:OwnerId', emitted[3].Action_Code__c, 'Only the first field is in chunk one');
+        Assert.areEqual('017000000000008AAA', emitted[4].Source_Record_Id__c, 'Next chunk starts a new group');
+        Assert.areEqual('field_changed:Rating', emitted[4].Action_Code__c, 'The second field must not be dropped');
+        Assert.areEqual('record_created', emitted[5].Action_Code__c, 'created field should produce record_created action');
         Assert.areEqual(24, adapter.overlapHours(), 'Watched object overlap override should be respected');
         Assert.areEqual(400, adapter.batchSize(), 'Watched object batch size override should be respected');
     }

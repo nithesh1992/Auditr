@@ -55,7 +55,11 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
     public static List<Id> dispatchActiveSources() {
         List<Id> jobIds = new List<Id>();
         for (AuditrSource adapter : AuditrSource.loadActiveSources()) {
-            jobIds.add(Database.executeBatch(new AuditrSyncBatch(adapter), adapter.batchSize()));
+            try {
+                jobIds.add(Database.executeBatch(new AuditrSyncBatch(adapter), adapter.batchSize()));
+            } catch (Exception ex) {
+                System.debug(LoggingLevel.ERROR, 'Auditr source dispatch failed: ' + ex.getMessage());
+            }
         }
         return jobIds;
     }
@@ -76,16 +80,17 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
      */
     public void execute(Database.BatchableContext context, List<SObject> scope) {
         totalSourceProcessed += scope.size();
-        accumulate(insertNewEntries(source.toEntries(scope), source.sourceKey()));
+        List<Auditr_Entry__c> entries = source.toEntries(scope);
+        entries.addAll(source.flush());
+        accumulate(insertNewEntries(entries, source.sourceKey()));
     }
 
     /**
-     * @description Inserts entries still held by the adapter, fails the job when any row failed, and chains
+     * @description Fails the job when any row failed, and chains
      * AuditrPurgeBatch after a successful Setup Audit Trail run when retention purging is enabled.
      * @param context BatchableContext provided by the platform.
      */
     public void finish(Database.BatchableContext context) {
-        accumulate(insertNewEntries(source.flush(), source.sourceKey()));
         if (totalFailedInserts > 0) {
             throw new AuditrSyncException(
                 'AuditrSyncBatch [' + source.sourceKey() + '] encountered ' + totalFailedInserts +

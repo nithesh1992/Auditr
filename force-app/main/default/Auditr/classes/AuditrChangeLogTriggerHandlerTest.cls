@@ -119,6 +119,50 @@ private class AuditrChangeLogTriggerHandlerTest {
     }
 
     @IsTest
+    private static void shouldRejectSealedInsert_WhenLifecycleBypassed() {
+        Test.startTest();
+        Database.SaveResult result = Database.insert(new Auditr_Change_Log__c(
+            Change_Request_Id__c = 'TEST-SEALED', Status__c = 'Sealed'
+        ), false, AccessLevel.SYSTEM_MODE);
+        Test.stopTest();
+        Assert.isFalse(result.isSuccess(), 'A new sealed log must be rejected');
+        Assert.isTrue(result.getErrors()[0].getMessage().contains(AuditrChangeLogTriggerHandler.INSERT_SEALED_ERROR),
+            'Error must explain the Draft requirement');
+    }
+
+    @IsTest
+    private static void shouldRequireNotes_WhenAbortedPackagingHasNoWarning() {
+        Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
+        List<Auditr_Entry__c> entries = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE LIMIT 1];
+        AuditrTestDataFactory.insertChangeLogItems(changeLog.Id, entries);
+
+        Test.startTest();
+        Id jobId = Database.executeBatch(new AuditrChangeLogBatch(changeLog.Id, new Set<Id>{ entries[0].Id }), 200);
+        changeLog.Packaging_Job_Id__c = String.valueOf(jobId);
+        Database.update(changeLog, AccessLevel.SYSTEM_MODE);
+        System.abortJob(jobId);
+        changeLog.Status__c = 'Sealed';
+        Database.SaveResult result = Database.update(changeLog, false, AccessLevel.SYSTEM_MODE);
+        Test.stopTest();
+        Assert.isFalse(result.isSuccess(), 'Aborted packaging requires explicit review');
+        Assert.isTrue(result.getErrors()[0].getMessage().contains(
+            AuditrChangeLogTriggerHandler.SEAL_PACKAGING_WARNING_REQUIRES_NOTES_ERROR), 'Notes must be required');
+    }
+
+    @IsTest
+    private static void shouldRejectWarningRemoval_WhenDraftIsEdited() {
+        Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
+        changeLog.Description__c = '[PACKAGING WARNING: citation failed]';
+        Database.update(changeLog, AccessLevel.SYSTEM_MODE);
+
+        Test.startTest();
+        changeLog.Description__c = 'Everything succeeded';
+        Database.SaveResult result = Database.update(changeLog, false, AccessLevel.SYSTEM_MODE);
+        Test.stopTest();
+        Assert.isFalse(result.isSuccess(), 'Failure warning must survive subsequent draft edits');
+    }
+
+    @IsTest
     private static void shouldBlockSeal_WhenPackagingWarningPresentWithoutNotes() {
         Auditr_Change_Log__c changeLog = AuditrTestDataFactory.insertChangeLog();
         List<Auditr_Entry__c> entries = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE ORDER BY Name ASC LIMIT 2];

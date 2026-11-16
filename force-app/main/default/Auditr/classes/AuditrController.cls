@@ -70,6 +70,7 @@ public with sharing class AuditrController {
         @AuraEnabled public Boolean isPurgeScheduleOwnerActive;
         @AuraEnabled public Boolean isStaleSync;
         @AuraEnabled public String healthWarning;
+        public Boolean hasRecentSyncFailure = false;
         @AuraEnabled public List<JobSummaryDTO> recentJobs;
         @AuraEnabled public List<RuleSummaryDTO> activeRules;
         @AuraEnabled public List<UnclassifiedActionDTO> topUnclassifiedActions;
@@ -231,7 +232,13 @@ public with sharing class AuditrController {
     public static Id runSyncNow() {
         requireAdminAccess();
         List<Id> jobIds = AuditrSyncBatch.dispatchActiveSources();
-        return jobIds.isEmpty() ? Database.executeBatch(new AuditrSyncBatch(), AuditrUtil.getBatchSize()) : jobIds[0];
+        if (jobIds.isEmpty()) {
+            String message = 'No source sync was queued. Check active source configuration and Apex job capacity.';
+            AuraHandledException ex = new AuraHandledException(message);
+            ex.setMessage(message);
+            throw ex;
+        }
+        return jobIds[0];
     }
 
     /**
@@ -412,6 +419,16 @@ public with sharing class AuditrController {
                 break;
             }
         }
+        if (syncClassId != null) {
+            DateTime recentSince = System.now().addHours(-STALE_SYNC_HOURS);
+            status.hasRecentSyncFailure = ![
+                SELECT Id FROM AsyncApexJob
+                WHERE ApexClassId = :syncClassId AND JobType = 'BatchApex'
+                    AND CreatedDate >= :recentSince
+                    AND (Status IN ('Failed', 'Aborted') OR NumberOfErrors > 0)
+                WITH SYSTEM_MODE LIMIT 1
+            ].isEmpty();
+        }
         for (AsyncApexJob job : [
             SELECT Id, ApexClassId, Status, JobItemsProcessed, TotalJobItems, NumberOfErrors, CreatedDate, CompletedDate, ExtendedStatus
             FROM AsyncApexJob
@@ -488,6 +505,7 @@ public with sharing class AuditrController {
         return actions;
     }
 
+    @TestVisible
     private static void evaluateHealthWarning(ControlCenterStatusDTO status) {
         Boolean lastSyncFailed = !status.recentJobs.isEmpty() && (status.recentJobs[0].status == 'Failed' || status.recentJobs[0].numberOfErrors > 0);
         Boolean isWatermarkStale = status.lastSyncedOccurredAt == null || status.lastSyncedOccurredAt < System.now().addHours(-STALE_SYNC_HOURS);
@@ -498,6 +516,9 @@ public with sharing class AuditrController {
         } else if (status.isPurgeScheduled && !status.isPurgeScheduleOwnerActive) {
             status.isStaleSync = true;
             status.healthWarning = 'Scheduled purge job owner (' + status.purgeScheduleOwnerUsername + ') is inactive. Reschedule Daily Purge.';
+        } else if (status.hasRecentSyncFailure == true) {
+            status.isStaleSync = true;
+            status.healthWarning = 'An Auditr source sync reported errors or was aborted in the last 36 hours. Inspect Apex Jobs, including jobs outside the recent list.';
         } else if (lastSyncFailed) {
             status.isStaleSync = true;
             status.healthWarning = 'The most recent Auditr batch job reported errors. Inspect recent jobs below.';

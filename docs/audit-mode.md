@@ -35,6 +35,8 @@ Each row cites **one audit entry inside one change log**, so the same event can 
 
 - **Sealing requires entries** — a change log with zero packaged citations cannot be sealed.
 - **Sealing stamps sign-off** — `Signed_Off_By__c` / `Signed_Off_At__c` are set from the sealing user and timestamp.
+- **Draft-only creation** — directly inserting a Sealed log is rejected.
+- **Partial packaging requires review** — `[PACKAGING WARNING]` is persisted when a chunk fails and at completion. It cannot be removed from a Draft log; document the discrepancy in Sign-Off Notes before sealing. Failed/aborted packaging jobs and jobs reporting errors also require notes. A Completed job can still have row-level warnings.
 - **Sealed = immutable** — no field updates, no re-opening to Draft, no deletion, no citation add/remove. Create a new change log instead.
 
 ---
@@ -60,12 +62,12 @@ The workspace is a single unified LWC (`auditrAuditMode`) integrating incident t
 The table displays all events in the filtered window, showing forensic details and a **Package Status** badge:
 - **Packaged Entries**: Show the external Change Request Id (e.g. `[ CR-10492 ]`) linking directly to the parent Change Log.
 - **Unassigned Entries**: Labeled `Unassigned`, immediately ready for packaging.
-- **Interactive Scope Bounding & Aggregates**: The interactive table renders up to 200 entries at a time to ensure instant UI responsiveness. When the filtered scope exceeds 200 events, a warning badge dynamically indicates `Showing first 200 of N events`. Aggregate counters (**Unassigned** and **Packaged**) reflect the full scope (up to 25,000 events), and **Package All Unassigned (M)** operates on the entire unassigned scope via asynchronous batch processing.
+- **Interactive Scope Bounding & Aggregates**: The table loads 200 entries per keyset page using **Load Next 200 Events**. Scope counts are capped at 5,000. **Packaged** counts actual citations; **Unassigned** counts eligible Setup entries only. Investigation-only Watched Object rows contribute to neither count unless explicitly cited outside this workflow.
 
 ### 4. Scalable Modal-First Packaging Workflow
 The top change log table has been replaced with a streamlined, scalable modal:
-- **Package Selected (N)** — Packages the explicitly selected entries (or bursts).
-- **Package All Unassigned (M)** — Packages every unassigned entry matching the current filter.
+- **Package Selected (N)** — Packages selected Setup entries (or eligible burst children). Watched Object selections are excluded in the UI and rejected by the Apex endpoint.
+- **Package All Unassigned (M)** — Packages every unassigned Setup entry matching the applied date, actor, and High/Critical risk filters. The queued batch retains the risk flag; counts and table pagination do not limit packaging.
 - **Package Changes Modal**:
   - **Link to Existing Change Log** — Search open `Draft` change logs by Change Request Id or Name via auto-complete.
   - **Create New Change Log** — On-the-fly creation requiring external `Change Request Id` (Jira, ServiceNow, etc.) with optional deployment date and description.
@@ -76,7 +78,7 @@ The top change log table has been replaced with a streamlined, scalable modal:
 ## Retention & Concurrency Interplay
 
 - **Packaged Evidence Exemption**: `AuditrPurgeBatch` **never purges packaged evidence** — its scope strictly excludes any entry cited by a change log item. Retention purge only removes unpackaged entries older than `Retention_Days__c`.
-- **In-Flight Packaging Seal Protection**: To eliminate packaging race conditions, an `Auditr_Change_Log__c` cannot transition to `Sealed` status while an asynchronous packaging batch (`Packaging_Job_Id__c`) is actively in flight. Any attempt to seal the change log before background packaging finishes is blocked by `AuditrChangeLogTriggerHandler`.
+- **In-Flight Packaging Seal Protection**: The parent is locked while validating and enqueueing packaging. Sealing is blocked while its job is active, and completion clears the pointer only when it matches that job. Warnings commit without an unhandled exception after the final update.
 
 ---
 
@@ -95,7 +97,7 @@ Audit Mode investigates both **Setup Audit Trail** (`SetupAuditTrail`) and **Wat
 Id logId = AuditrChangeLogController.createChangeLog('PROJ-1234', System.now().addDays(2), 'Q4 release bundle');
 
 // Package every unassigned entry in a window for one actor (async)
-Id jobId = AuditrChangeLogController.packageFilteredEntries(logId, System.now().addDays(-7), System.now(), 'release.eng@acme.com');
+Id jobId = AuditrChangeLogController.packageFilteredEntries(logId, System.now().addDays(-7), System.now(), 'release.eng@acme.com', false);
 
 // Package a curated selection (async)
 Id jobId2 = AuditrChangeLogController.packageEntries(logId, new List<Id>{ entryId1, entryId2 });

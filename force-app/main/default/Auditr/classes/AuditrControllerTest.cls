@@ -4,6 +4,18 @@
 @IsTest
 @SuppressWarnings('PMD.MethodNamingConventions')
 private class AuditrControllerTest {
+    private class EmptySource extends AuditrSource {
+        public override String sourceKey() {
+            return 'LoginHistory';
+        }
+        public override Database.QueryLocator getQueryLocator(DateTime cutoff) {
+            return Database.getQueryLocator([SELECT Id FROM User WHERE Id = NULL WITH SYSTEM_MODE]);
+        }
+        public override List<Auditr_Entry__c> toEntries(List<SObject> rows) {
+            return new List<Auditr_Entry__c>();
+        }
+    }
+
     @TestSetup
     private static void setupTestData() {
         AuditrTestDataFactory.assignAdminPermissionSet();
@@ -156,5 +168,21 @@ private class AuditrControllerTest {
             Test.stopTest();
             AuditrController.testAdminAccessOverride = null;
         }
+    }
+
+    @IsTest
+    private static void shouldShowSourceFailure_WhenAnotherSourceCompletesLater() {
+        AuditrController.ControlCenterStatusDTO status;
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+            Test.startTest();
+            Id aborted = Database.executeBatch(new AuditrSyncBatch(new EmptySource()), 200);
+            System.abortJob(aborted);
+            Database.executeBatch(new AuditrSyncBatch(new EmptySource()), 200);
+            Test.stopTest();
+
+            status = AuditrController.getControlCenterStatus();
+        }
+        Assert.isTrue(status.hasRecentSyncFailure, 'The separate health query must find the older aborted source');
+        Assert.isTrue(status.healthWarning.contains('source sync'), 'A later success must not hide the failure notice');
     }
 }
