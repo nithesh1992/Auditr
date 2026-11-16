@@ -35,21 +35,7 @@ force-app/main/default/Auditr/
 
 ## End-to-End Pipeline
 
-```mermaid
-flowchart LR
-    SAT[("SetupAuditTrail")] -->|"AuditrSetupAuditTrailSource"| SYNC["AuditrSyncBatch (Per-Source Watermark)"]
-    HIST[("<Object>History (Watched Objects)")] -->|"AuditrWatchedObjectSource + Login-As Correlation"| SYNC
-    SYNC -->|"AuditrUtil Rule Engine (38 Auditr_Rule__mdt)"| ENTRY[("Auditr_Entry__c")]
-    TRIG["AuditrEntryTrigger"] -->|"Blocks Delete & Unauthorized Update"| ENTRY
-    REC["AuditrReclassifyBatch"] -->|"Updates Category & Risk Only"| ENTRY
-    PURGE["AuditrPurgeBatch"] -->|"Deletes > Retention_Days__c (packaged exempt)"| ENTRY
-    ENTRY --> HOME["Auditr Home (At-a-Glance KPIs + Dashboard)"]
-    ENTRY --> AM["Audit Mode (investigation & packaging)"]
-    ENTRY --> CC["Auditr Control Center (Sync + Watched Readiness)"]
-    AM -->|"AuditrChangeLogBatch (async)"| ITEM[("Auditr_Change_Log_Item__c")]
-    LOG[("Auditr_Change_Log__c")] -->|"1:N citations"| ITEM
-    ITEM -->|"cites (M:N)"| ENTRY
-```
+![Auditr End-to-End Pipeline](/auditr-pipeline.svg)
 
 1. **Per-Source Watermark Resolution (`AuditrSource.resolveCutoff`)**:
    - Each active `AuditrSource` adapter (`AuditrSetupAuditTrailSource` and each active `AuditrWatchedObjectSource`) resolves its own watermark (`Occurred_At__c` scoped by `Source__c` and `Target_Object__c`) and subtracts its configured `Overlap_Hours__c` (default 48 hours).

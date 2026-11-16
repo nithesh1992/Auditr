@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 540" width="1200" height="540" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1200" y2="540" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#090D10"/>
+      <stop offset="50%" stop-color="#0E1419"/>
+      <stop offset="100%" stop-color="#090D10"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#10B981" stroke-opacity="0.06" stroke-width="1"/>
+    </pattern>
+    <linearGradient id="cardGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#162028"/>
+      <stop offset="100%" stop-color="#0F161C"/>
+    </linearGradient>
+    <linearGradient id="vaultGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0E2920"/>
+      <stop offset="100%" stop-color="#091B15"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#10B981"/>
+    </marker>
+    <marker id="arrowMuted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#64748B"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="540" rx="18" fill="url(#bgGrad)" stroke="#1E293B" stroke-width="1.5"/>
+  <rect width="1200" height="540" rx="18" fill="url(#grid)"/>
+
+  <!-- Column Headers -->
+  <g font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" letter-spacing="1.2" fill="#34D399">
+    <text x="145" y="42" text-anchor="middle">1. AUDIT SOURCES</text>
+    <text x="435" y="42" text-anchor="middle">2. INGESTION &amp; INTELLIGENCE</text>
+    <text x="735" y="42" text-anchor="middle">3. TAMPER-PROTECTED VAULT</text>
+    <text x="1040" y="42" text-anchor="middle">4. WORKSPACES &amp; PACKAGING</text>
+  </g>
+
+  <!-- Column 1: Sources -->
+  <!-- SetupAuditTrail -->
+  <rect x="40" y="95" width="210" height="110" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.5"/>
+  <text x="145" y="130" text-anchor="middle" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#F8FAFC">SetupAuditTrail</text>
+  <text x="145" y="154" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11.5" fill="#34D399">AuditrSetupAuditTrailSource</text>
+  <text x="145" y="178" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#94A3B8">Admin &amp; metadata changes</text>
+
+  <!-- Watched Objects -->
+  <rect x="40" y="255" width="210" height="130" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.5"/>
+  <text x="145" y="290" text-anchor="middle" font-family="system-ui, sans-serif" font-size="15" font-weight="700" fill="#F8FAFC">&lt;Object&gt;History</text>
+  <text x="145" y="314" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11.5" fill="#34D399">AuditrWatchedObjectSource</text>
+  <text x="145" y="338" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#94A3B8">Field names, actor &amp; time</text>
+  <text x="145" y="358" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11.5" fill="#64748B">(Never OldValue / NewValue)</text>
+
+  <!-- Column 2: Ingestion & Intelligence -->
+  <!-- AuditrSyncBatch -->
+  <rect x="320" y="95" width="230" height="110" rx="12" fill="url(#cardGrad)" stroke="#10B981" stroke-opacity="0.55" stroke-width="1.5"/>
+  <text x="435" y="128" text-anchor="middle" font-family="ui-monospace, monospace" font-size="15" font-weight="700" fill="#F8FAFC">AuditrSyncBatch</text>
+  <text x="435" y="152" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#CBD5E1">1 isolated batch job per source</text>
+  <text x="435" y="174" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11.5" fill="#94A3B8">Per-source watermark + 48h overlap</text>
+
+  <!-- AuditrLoginAsCorrelator -->
+  <rect x="320" y="235" width="230" height="92" rx="12" fill="url(#cardGrad)" stroke="#F59E0B" stroke-opacity="0.55" stroke-width="1.5"/>
+  <text x="435" y="266" text-anchor="middle" font-family="ui-monospace, monospace" font-size="13.5" font-weight="700" fill="#FDE68A">AuditrLoginAsCorrelator</text>
+  <text x="435" y="289" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#CBD5E1">Correlates Login-As windows</text>
+  <text x="435" y="309" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#94A3B8">SetupAuditTrail + AuthSession</text>
+
+  <!-- AuditrUtil Rule Engine -->
+  <rect x="320" y="355" width="230" height="92" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.5"/>
+  <text x="435" y="386" text-anchor="middle" font-family="ui-monospace, monospace" font-size="14" font-weight="700" fill="#F8FAFC">AuditrUtil Rule Engine</text>
+  <text x="435" y="409" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12" fill="#34D399">38 Auditr_Rule__mdt rules</text>
+  <text x="435" y="429" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11.5" fill="#94A3B8">Stamps Risk Level &amp; Category</text>
+
+  <!-- Column 3: Vault & Maintenance -->
+  <!-- Auditr_Entry__c -->
+  <rect x="625" y="135" width="220" height="125" rx="14" fill="url(#vaultGrad)" stroke="#10B981" stroke-width="2"/>
+  <text x="735" y="170" text-anchor="middle" font-family="ui-monospace, monospace" font-size="16" font-weight="700" fill="#6EE7B7">Auditr_Entry__c</text>
+  <text x="735" y="194" text-anchor="middle" font-family="system-ui, sans-serif" font-size="12.5" fill="#E2E8F0">Immutable Audit Vault</text>
+  <text x="735" y="216" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11.5" fill="#94A3B8">Deduplicated by Source_Record_Id__c</text>
+  <text x="735" y="236" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#34D399">SetupAuditTrail + DataChange</text>
+
+  <!-- Trigger + Reclassify + Purge -->
+  <rect x="625" y="295" width="220" height="58" rx="10" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
+  <text x="735" y="321" text-anchor="middle" font-family="ui-monospace, monospace" font-size="12.5" font-weight="600" fill="#F8FAFC">AuditrEntryTrigger</text>
+  <text x="735" y="340" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#94A3B8">Blocks edits &amp; unauthorized deletes</text>
+
+  <rect x="625" y="370" width="220" height="58" rx="10" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
+  <text x="735" y="396" text-anchor="middle" font-family="ui-monospace, monospace" font-size="12.5" font-weight="600" fill="#F8FAFC">AuditrReclassifyBatch</text>
+  <text x="735" y="415" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#94A3B8">Re-evaluates Risk &amp; Category</text>
+
+  <rect x="625" y="445" width="220" height="58" rx="10" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.2"/>
+  <text x="735" y="471" text-anchor="middle" font-family="ui-monospace, monospace" font-size="12.5" font-weight="600" fill="#F8FAFC">AuditrPurgeBatch</text>
+  <text x="735" y="490" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#94A3B8">Retention purge (packaged exempt)</text>
+
+  <!-- Column 4: Workspaces & Packaging -->
+  <!-- Auditr Home -->
+  <rect x="920" y="75" width="240" height="76" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.5"/>
+  <text x="1040" y="106" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#F8FAFC">Auditr Home</text>
+  <text x="1040" y="128" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11.5" fill="#94A3B8">7 KPIs + Security Dashboard</text>
+
+  <!-- Control Center -->
+  <rect x="920" y="168" width="240" height="76" rx="12" fill="url(#cardGrad)" stroke="#334155" stroke-width="1.5"/>
+  <text x="1040" y="199" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#F8FAFC">Auditr Control Center</text>
+  <text x="1040" y="221" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11.5" fill="#94A3B8">Sync, Schedules &amp; Watched Readiness</text>
+
+  <!-- Audit Mode -->
+  <rect x="920" y="261" width="240" height="90" rx="12" fill="url(#cardGrad)" stroke="#10B981" stroke-opacity="0.6" stroke-width="1.5"/>
+  <text x="1040" y="292" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="700" fill="#F8FAFC">Audit Mode Workspace</text>
+  <text x="1040" y="314" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11.5" fill="#CBD5E1">Incident (±time), Bursts &amp; Packaging</text>
+  <text x="1040" y="334" text-anchor="middle" font-family="ui-monospace, monospace" font-size="11" fill="#34D399">AuditrChangeLogBatch (async)</text>
+
+  <!-- Change Log & Items -->
+  <rect x="920" y="385" width="240" height="118" rx="12" fill="url(#vaultGrad)" stroke="#10B981" stroke-width="1.5"/>
+  <text x="1040" y="416" text-anchor="middle" font-family="ui-monospace, monospace" font-size="13.5" font-weight="700" fill="#6EE7B7">Auditr_Change_Log__c</text>
+  <text x="1040" y="438" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11.5" fill="#E2E8F0">+ Auditr_Change_Log_Item__c (M:N)</text>
+  <text x="1040" y="460" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#94A3B8">Bound to Change_Request_Id__c</text>
+  <text x="1040" y="480" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#34D399">Sealed = Immutable + Auditor Sign-Off</text>
+
+  <!-- Connectors -->
+  <!-- Sources -> Sync / Correlator -->
+  <path d="M 250 150 L 312 150" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M 250 285 L 285 285 L 285 170 L 312 170" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M 250 315 L 312 282" stroke="#F59E0B" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+
+  <!-- Correlator -> Sync -> Rule Engine -->
+  <path d="M 435 235 L 435 212" stroke="#F59E0B" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <path d="M 435 205 L 435 230" stroke="none"/>
+  <path d="M 550 150 L 585 150 L 585 401 L 556 401" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- Sync & Rules -> Auditr_Entry__c -->
+  <path d="M 550 150 L 617 180" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M 550 401 L 595 401 L 595 215 L 617 215" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <!-- Guardrails -> Auditr_Entry__c -->
+  <path d="M 735 295 L 735 267" stroke="#64748B" stroke-width="1.6" marker-end="url(#arrowMuted)"/>
+
+  <!-- Auditr_Entry__c -> Workspaces -->
+  <path d="M 845 175 L 882 175 L 882 113 L 912 113" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <path d="M 845 198 L 912 206" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <path d="M 845 220 L 882 220 L 882 306 L 912 306" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrow)"/>
+
+  <!-- Audit Mode -> Change Log -> Cites Auditr_Entry__c -->
+  <path d="M 1040 351 L 1040 378" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M 920 444 L 870 444 L 870 242 L 852 242" stroke="#34D399" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+</svg>
