@@ -109,6 +109,7 @@ public with sharing class AuditrChangeLogTriggerHandler {
             for (AsyncApexJob job : [
                 SELECT Id FROM AsyncApexJob
                 WHERE Id IN :candidateJobIds AND Status IN :ACTIVE_JOB_STATUSES
+                WITH SYSTEM_MODE
             ]) {
                 activeJobIds.add(job.Id);
             }

@@ -3,7 +3,7 @@
  * source-scoped classification, generic batch ingestion with flush(), and per-source failure surfacing.
  */
 @IsTest
-@SuppressWarnings('PMD.ApexUnitTestClassShouldHaveRunAs,PMD.MethodNamingConventions')
+@SuppressWarnings('PMD.ApexUnitTestClassShouldHaveRunAs,PMD.MethodNamingConventions,PMD.AvoidHardcodingId')
 private class AuditrSourceTest {
     private static final String FAKE_SOURCE = 'LoginHistory';
 
@@ -362,6 +362,9 @@ private class AuditrSourceTest {
             )
         };
         AuditrSource.testSourcesOverride = new List<Auditr_Source__mdt>();
+        AuditrWatchedObjectSource.testTrackedFieldsOverride = new Map<String, Set<String>>{
+            'auditr_change_log__c' => new Set<String>{ 'status__c', 'description__c' }
+        };
 
         Auditr_Change_Log__History syntheticHistory = (Auditr_Change_Log__History) JSON.deserialize(
             '{"attributes":{"type":"Auditr_Change_Log__History"},' +
@@ -394,6 +397,7 @@ private class AuditrSourceTest {
         Assert.areEqual(1, flushedEntries.size(), 'flush() should emit the buffered history entry');
         Assert.areEqual('Auditr_Change_Log__c', flushedEntries[0].Target_Object__c, 'Target_Object__c should be stamped');
         Assert.areEqual('a00000000000001AAA', flushedEntries[0].Target_Record_Id__c, 'Target_Record_Id__c should be stamped');
+        AuditrWatchedObjectSource.testTrackedFieldsOverride = null;
     }
 
     @IsTest
@@ -487,5 +491,86 @@ private class AuditrSourceTest {
         Assert.isNull(emitted[1].Delegate_User__c, 'Change after suOrgAdminLogout should not infer a Delegate_User__c');
         Assert.areEqual(impersonatedUsername, emitted[1].Responsible_Username__c, 'Change after logout should attribute to the actor directly');
         Assert.areEqual('Medium', emitted[1].Risk_Level__c, 'Change after logout should use the watched object default risk');
+    }
+
+    @IsTest
+    private static void shouldCorrelateDisplayTargetLoginAsAndNormalizeSpecialHistoryTokens_WhenProcessed() {
+        Id impersonatedUserId = UserInfo.getUserId();
+        String impersonatedUsername = UserInfo.getUserName();
+        String impersonatedDisplayName = UserInfo.getName();
+        String adminActorUsername = 'org.admin@example.com';
+        DateTime loginTime = DateTime.newInstanceGmt(2026, 11, 10, 9, 0, 0);
+        DateTime saveTime = loginTime.addMinutes(5);
+        DateTime lifecycleTime = loginTime.addMinutes(8);
+
+        // Display-target representation: Actor_Username__c is the admin, Delegate_User__c is null,
+        // and Display__c names the impersonated user by Name
+        Database.insert(new Auditr_Entry__c(
+            RecordTypeId = AuditrUtil.getSetupAuditTrailRecordTypeId(),
+            Source__c = AuditrUtil.DEFAULT_SOURCE,
+            Source_Record_Id__c = '0Ym000000000010AAA',
+            Occurred_At__c = loginTime,
+            Actor_Username__c = adminActorUsername,
+            Responsible_Username__c = adminActorUsername,
+            Action_Code__c = 'suloginaccessused',
+            Section__c = 'Manage Users',
+            Category__c = 'Users & Sessions',
+            Risk_Level__c = 'Critical',
+            Display__c = 'Logged in using Login-As access for ' + impersonatedDisplayName + '.'
+        ), AccessLevel.SYSTEM_MODE);
+
+        AuditrWatchedObjectSource adapter = new AuditrWatchedObjectSource(
+            new Auditr_Watched_Object__mdt(
+                DeveloperName = 'Account_Special_Watch',
+                MasterLabel = 'Account Special Watch',
+                Object_API_Name__c = 'Account',
+                Is_Active__c = true,
+                Watched_Fields__c = 'Name,OwnerId',
+                Default_Risk_Level__c = 'Medium',
+                Category__c = 'Data & Schema'
+            )
+        );
+
+        List<AuditrWatchedObjectSource.HistoryRowInput> inputs = new List<AuditrWatchedObjectSource.HistoryRowInput>{
+            // Save run starts with an unwatched field (BillingCity at 201), followed by ignored noise (feedEvent at 202),
+            // TextName (normalized to Name at 203), and Owner (normalized to OwnerId at 204)
+            new AuditrWatchedObjectSource.HistoryRowInput(
+                '017000000000201AAA', '001000000000010AAA', 'BillingCity', impersonatedUserId, impersonatedUsername, saveTime
+            ),
+            new AuditrWatchedObjectSource.HistoryRowInput(
+                '017000000000202AAA', '001000000000010AAA', 'feedEvent', impersonatedUserId, impersonatedUsername, saveTime
+            ),
+            new AuditrWatchedObjectSource.HistoryRowInput(
+                '017000000000203AAA', '001000000000010AAA', 'TextName', impersonatedUserId, impersonatedUsername, saveTime
+            ),
+            new AuditrWatchedObjectSource.HistoryRowInput(
+                '017000000000204AAA', '001000000000010AAA', 'Owner', impersonatedUserId, impersonatedUsername, saveTime
+            ),
+            // Isolated lifecycle tokens: accountMerged, locked, unlocked
+            new AuditrWatchedObjectSource.HistoryRowInput(
+                '017000000000205AAA', '001000000000010AAA', 'accountMerged', impersonatedUserId, impersonatedUsername, lifecycleTime
+            ),
+            new AuditrWatchedObjectSource.HistoryRowInput(
+                '017000000000206AAA', '001000000000010AAA', 'locked', impersonatedUserId, impersonatedUsername, lifecycleTime
+            ),
+            new AuditrWatchedObjectSource.HistoryRowInput(
+                '017000000000207AAA', '001000000000010AAA', 'unlocked', impersonatedUserId, impersonatedUsername, lifecycleTime
+            )
+        };
+
+        Test.startTest();
+        List<Auditr_Entry__c> emitted = new List<Auditr_Entry__c>();
+        emitted.addAll(adapter.processHistoryInputs(inputs));
+        emitted.addAll(adapter.flush());
+        Test.stopTest();
+
+        Assert.areEqual(4, emitted.size(), 'Should emit 1 grouped field save + 3 isolated lifecycle events');
+        Assert.areEqual('017000000000201AAA', emitted[0].Source_Record_Id__c, 'Source_Record_Id__c should anchor to the first row of the save run even when unwatched');
+        Assert.areEqual('fields_changed:2', emitted[0].Action_Code__c, 'TextName->Name and Owner->OwnerId should merge into 2 watched fields while skipping feedEvent');
+        Assert.isTrue(emitted[0].Display__c.contains('Changed Name, OwnerId on Account'), 'TextName and Owner should normalize to Name and OwnerId');
+        Assert.areEqual(adminActorUsername, emitted[0].Delegate_User__c, 'Display-target Login-As entry should resolve impersonated user by Name and attribute admin as delegate');
+        Assert.areEqual('record_merged', emitted[1].Action_Code__c, 'accountMerged should map to record_merged');
+        Assert.areEqual('record_locked', emitted[2].Action_Code__c, 'locked should map to record_locked');
+        Assert.areEqual('record_unlocked', emitted[3].Action_Code__c, 'unlocked should map to record_unlocked');
     }
 }

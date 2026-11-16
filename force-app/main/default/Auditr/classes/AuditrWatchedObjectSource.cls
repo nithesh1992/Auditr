@@ -7,65 +7,38 @@
 public with sharing class AuditrWatchedObjectSource extends AuditrSource {
     public static final String DEFAULT_WATCHED_CATEGORY = 'Data & Schema';
     public static final String DEFAULT_WATCHED_RISK = 'Medium';
-    public static final Integer DEFAULT_LOGIN_AS_MAX_MINUTES = 120;
+
+    private static final Set<String> IGNORED_HISTORY_FIELDS = new Set<String>{
+        'feedevent',
+        'owneraccepted',
+        'ownerassignment'
+    };
+    private static final Set<String> MERGE_HISTORY_FIELDS = new Set<String>{
+        'accountmerged',
+        'contactmerged',
+        'leadmerged'
+    };
+    private static final Set<String> ISOLATED_EVENT_TOKENS = new Set<String>{
+        'created',
+        'record_merged',
+        'record_locked',
+        'record_unlocked'
+    };
 
     @TestVisible private static List<Auditr_Watched_Object__mdt> testWatchedObjectsOverride;
-    @TestVisible private static List<LoginAsWindow> testLoginAsWindowsOverride;
+    @TestVisible private static Map<String, Set<String>> testTrackedFieldsOverride;
 
-    /** @description Time window representing an active Login-As impersonation session correlated from Setup Audit Trail. */
-    public class LoginAsWindow {
-        public Id actorId;
-        public String actorUsername;
-        public String delegateUser;
-        public DateTime startAt;
-        public DateTime endAt;
-
-        /**
-         * @description Constructs a Login-As correlation window.
-         * @param actorId Impersonated user ID.
-         * @param actorUsername Impersonated username.
-         * @param delegateUser Admin/support username who performed the Login-As action.
-         * @param startAt Session start timestamp (suOrgAdminLogin / suNetworkAdminLogin).
-         * @param endAt Session end timestamp (suOrgAdminLogout / suNetworkAdminLogout or fallback timeout).
-         */
-        @SuppressWarnings('PMD.ExcessiveParameterList')
-        public LoginAsWindow(
-            Id actorId,
-            String actorUsername,
-            String delegateUser,
-            DateTime startAt,
-            DateTime endAt
-        ) {
-            this.actorId = actorId;
-            this.actorUsername = actorUsername;
-            this.delegateUser = delegateUser;
-            this.startAt = startAt;
-            this.endAt = endAt;
-        }
-
-        /**
-         * @description Checks whether a history event for the given actor and timestamp falls inside this Login-As window.
-         * @param candidateActorId Actor User ID from the Field History row.
-         * @param candidateActorUsername Actor Username from the Field History row.
-         * @param occurredAt Timestamp of the Field History row.
-         * @return True when the event falls within [startAt, endAt] for the same impersonated user.
-         */
-        public Boolean matches(Id candidateActorId, String candidateActorUsername, DateTime occurredAt) {
-            if (occurredAt == null || String.isBlank(this.delegateUser) || this.startAt == null || this.endAt == null) {
-                return false;
-            }
-            if (occurredAt < this.startAt || occurredAt > this.endAt) {
-                return false;
-            }
-            if (this.actorId != null && candidateActorId != null) {
-                return this.actorId == candidateActorId;
-            }
-            if (String.isNotBlank(this.actorUsername) && String.isNotBlank(candidateActorUsername)) {
-                return this.actorUsername.trim().equalsIgnoreCase(candidateActorUsername.trim());
-            }
-            return false;
-        }
-    }
+    private Auditr_Watched_Object__mdt watchedConfig;
+    private String objectApiName;
+    private String historyObjectName;
+    private String parentFieldName;
+    private String defaultCategory = DEFAULT_WATCHED_CATEGORY;
+    private String defaultRiskLevel = DEFAULT_WATCHED_RISK;
+    private Set<String> watchedFieldsLower = new Set<String>();
+    private Set<String> validFieldsLower = new Set<String>();
+    private PendingGroup pendingGroup;
+    private SaveRunAnchor currentRunAnchor;
+    private List<AuditrLoginAsCorrelator.LoginAsWindow> cachedLoginAsWindows;
 
     /** @description Resolved Field History table metadata for a watched SObject. */
     public class HistoryMetadata {
@@ -90,7 +63,7 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
          * @description Constructs a normalized Field History row input.
          * @param historyId 18-character ID of the history row.
          * @param parentId 18-character ID of the modified target record.
-         * @param fieldName API name of the changed field (or 'created').
+         * @param fieldName API name of the changed field (or lifecycle token).
          * @param actorId User ID of the actor who made the change.
          * @param actorUsername Username of the actor.
          * @param occurredAt Timestamp of the history row.
@@ -114,6 +87,7 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
     }
 
     /** @description Readiness status of a configured Auditr_Watched_Object__mdt record. */
+    @SuppressWarnings('PMD.AvoidBooleanMethodParameters,PMD.ApexDoc')
     public class WatchedObjectReadiness {
         @AuraEnabled public String developerName { get; set; }
         @AuraEnabled public String label { get; set; }
@@ -130,6 +104,27 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
         @AuraEnabled public String statusMessage { get; set; }
     }
 
+    /** @description Tracks the first history row ID of a consecutive (parentId, actorId, occurredAt) save run. */
+    private class SaveRunAnchor {
+        public String firstHistoryId;
+        public String parentId;
+        public Id actorId;
+        public DateTime occurredAt;
+
+        SaveRunAnchor(HistoryRowInput row) {
+            this.firstHistoryId = row.historyId;
+            this.parentId = row.parentId;
+            this.actorId = row.actorId;
+            this.occurredAt = row.occurredAt;
+        }
+
+        Boolean matches(HistoryRowInput row) {
+            return this.parentId == row.parentId
+                && this.actorId == row.actorId
+                && this.occurredAt == row.occurredAt;
+        }
+    }
+
     private class PendingGroup {
         public String firstHistoryId;
         public String parentId;
@@ -139,31 +134,26 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
         public List<String> fields = new List<String>();
         private Set<String> fieldsLower = new Set<String>();
 
-        PendingGroup(HistoryRowInput firstRow) {
-            this.firstHistoryId = firstRow.historyId;
+        PendingGroup(String anchoredHistoryId, HistoryRowInput firstRow, String canonicalField) {
+            this.firstHistoryId = anchoredHistoryId;
             this.parentId = firstRow.parentId;
             this.actorId = firstRow.actorId;
             this.actorUsername = firstRow.actorUsername;
             this.occurredAt = firstRow.occurredAt;
-            addField(firstRow.fieldName);
+            addField(canonicalField);
         }
 
-        Boolean isSameRun(
-            String candidateParentId,
-            Id candidateActorId,
-            DateTime candidateOccurredAt,
-            String candidateField
-        ) {
-            if (isCreatedEvent() || 'created'.equalsIgnoreCase(candidateField != null ? candidateField.trim() : '')) {
+        Boolean isSameRun(HistoryRowInput candidate, String canonicalField) {
+            if (isIsolatedEvent() || isIsolatedToken(canonicalField)) {
                 return false;
             }
-            return this.parentId == candidateParentId
-                && this.actorId == candidateActorId
-                && this.occurredAt == candidateOccurredAt;
+            return this.parentId == candidate.parentId
+                && this.actorId == candidate.actorId
+                && this.occurredAt == candidate.occurredAt;
         }
 
-        Boolean isCreatedEvent() {
-            return this.fields.size() == 1 && 'created'.equalsIgnoreCase(this.fields[0]);
+        Boolean isIsolatedEvent() {
+            return this.fields.size() == 1 && isIsolatedToken(this.fields[0]);
         }
 
         void addField(String fieldName) {
@@ -173,17 +163,6 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
             }
         }
     }
-
-    private Auditr_Watched_Object__mdt watchedConfig;
-    private String objectApiName;
-    private String historyObjectName;
-    private String parentFieldName;
-    private String defaultCategory = DEFAULT_WATCHED_CATEGORY;
-    private String defaultRiskLevel = DEFAULT_WATCHED_RISK;
-    private Set<String> watchedFieldsLower = new Set<String>();
-    private Set<String> validFieldsLower = new Set<String>();
-    private PendingGroup pendingGroup;
-    private List<LoginAsWindow> cachedLoginAsWindows;
 
     /**
      * @description Default constructor for dynamic instantiation.
@@ -324,31 +303,7 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
         }
         ensureLoginAsWindowsLoaded(inputs);
         for (HistoryRowInput input : inputs) {
-            if (input == null || String.isBlank(input.historyId) || String.isBlank(input.parentId)
-                || String.isBlank(input.fieldName) || input.occurredAt == null) {
-                continue;
-            }
-            String canonicalField = canonicalizeFieldName(input.fieldName);
-            if (pendingGroup != null
-                && !pendingGroup.isSameRun(input.parentId, input.actorId, input.occurredAt, canonicalField)) {
-                emitted.add(buildEntryFromGroup(pendingGroup));
-                pendingGroup = null;
-            }
-            if (!isWatchedField(canonicalField)) {
-                continue;
-            }
-            if (pendingGroup == null) {
-                pendingGroup = new PendingGroup(new HistoryRowInput(
-                    input.historyId,
-                    input.parentId,
-                    canonicalField,
-                    input.actorId,
-                    input.actorUsername,
-                    input.occurredAt
-                ));
-            } else {
-                pendingGroup.addField(canonicalField);
-            }
+            processSingleInput(input, emitted);
         }
         return emitted;
     }
@@ -363,6 +318,7 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
             emitted.add(buildEntryFromGroup(pendingGroup));
             pendingGroup = null;
         }
+        currentRunAnchor = null;
         return emitted;
     }
 
@@ -417,43 +373,7 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
         Map<String, Set<String>> trackedFieldsByObject = queryTrackedFieldsByObject(registry);
         List<WatchedObjectReadiness> results = new List<WatchedObjectReadiness>();
         for (Auditr_Watched_Object__mdt record : registry) {
-            WatchedObjectReadiness item = new WatchedObjectReadiness();
-            item.developerName = record.DeveloperName;
-            item.label = record.MasterLabel;
-            item.objectApiName = record.Object_API_Name__c;
-            item.isActive = (record.Is_Active__c == true);
-            item.defaultRiskLevel = String.isNotBlank(record.Default_Risk_Level__c)
-                ? record.Default_Risk_Level__c
-                : DEFAULT_WATCHED_RISK;
-            item.category = String.isNotBlank(record.Category__c)
-                ? record.Category__c
-                : DEFAULT_WATCHED_CATEGORY;
-            item.watchedFields = parseWatchedFieldsDisplay(record.Watched_Fields__c);
-            item.missingFields = new List<String>();
-            List<String> untrackedFields = new List<String>();
-
-            HistoryMetadata meta = resolveHistoryMetadata(record.Object_API_Name__c);
-            item.isObjectValid = meta.isObjectValid;
-            item.isHistoryAvailable = meta.isHistoryAvailable;
-            item.historyObjectName = meta.historyObjectName;
-            Set<String> trackedLower = new Set<String>();
-            if (meta.isObjectValid) {
-                item.objectApiName = meta.objectApiName;
-                trackedLower = trackedFieldsByObject.get(meta.objectApiName.toLowerCase()) ?? new Set<String>();
-                for (String configuredField : item.watchedFields) {
-                    String lowerField = configuredField.toLowerCase();
-                    if (!meta.validFieldsLower.contains(lowerField)) {
-                        item.missingFields.add(configuredField);
-                    } else if (!Test.isRunningTest() && !trackedLower.contains(lowerField)) {
-                        untrackedFields.add(configuredField);
-                    }
-                }
-            }
-            Boolean hasAnyTrackedField = Test.isRunningTest() || !trackedLower.isEmpty();
-            item.isReady = item.isObjectValid && item.isHistoryAvailable && hasAnyTrackedField
-                && item.missingFields.isEmpty() && untrackedFields.isEmpty();
-            item.statusMessage = buildStatusMessage(item, hasAnyTrackedField, untrackedFields);
-            results.add(item);
+            results.add(evaluateRecordReadiness(record, trackedFieldsByObject));
         }
         return results;
     }
@@ -468,9 +388,8 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
         if (String.isBlank(rawObjectApiName)) {
             return meta;
         }
-        String trimmed = rawObjectApiName.trim();
         Map<String, Schema.SObjectType> globalDescribe = Schema.getGlobalDescribe();
-        Schema.SObjectType targetType = globalDescribe.get(trimmed);
+        Schema.SObjectType targetType = globalDescribe.get(rawObjectApiName.trim());
         if (targetType == null) {
             return meta;
         }
@@ -479,35 +398,10 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
         meta.objectApiName = targetDescribe.getName();
         meta.validFieldsLower.addAll(targetDescribe.fields.getMap().keySet());
 
-        List<String> candidateHistoryNames = new List<String>();
-        if (meta.objectApiName.endsWithIgnoreCase('__c')) {
-            String baseName = meta.objectApiName.substring(0, meta.objectApiName.length() - 3);
-            candidateHistoryNames.add(baseName + '__History');
-        } else {
-            candidateHistoryNames.add(meta.objectApiName + 'FieldHistory');
-            candidateHistoryNames.add(meta.objectApiName + 'History');
-        }
-
-        for (String candidateName : candidateHistoryNames) {
-            Schema.SObjectType historyType = globalDescribe.get(candidateName);
-            if (historyType == null) {
-                continue;
+        for (String candidateName : buildCandidateHistoryNames(meta.objectApiName)) {
+            if (populateHistoryTableDetails(meta, globalDescribe.get(candidateName))) {
+                break;
             }
-            Schema.DescribeSObjectResult historyDescribe = historyType.getDescribe();
-            Map<String, Schema.SObjectField> historyFields = historyDescribe.fields.getMap();
-            if (!historyFields.containsKey('field') || !historyFields.containsKey('createddate')) {
-                continue;
-            }
-            String parentKey = historyFields.containsKey('parentid')
-                ? 'parentid'
-                : (meta.objectApiName + 'Id').toLowerCase();
-            if (!historyFields.containsKey(parentKey)) {
-                continue;
-            }
-            meta.isHistoryAvailable = true;
-            meta.historyObjectName = historyDescribe.getName();
-            meta.parentFieldName = historyFields.get(parentKey).getDescribe().getName();
-            break;
         }
         return meta;
     }
@@ -518,35 +412,104 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
      * @return AuditrUtil.ClassificationResult with the watched object's defaults.
      */
     public static AuditrUtil.ClassificationResult getDefaultsForObject(String targetObject) {
-        if (String.isNotBlank(targetObject)) {
-            for (Auditr_Watched_Object__mdt record : getWatchedRegistry()) {
-                if (String.isNotBlank(record.Object_API_Name__c)
-                    && record.Object_API_Name__c.trim().equalsIgnoreCase(targetObject.trim())) {
-                    return new AuditrUtil.ClassificationResult(
-                        String.isNotBlank(record.Category__c) ? record.Category__c : DEFAULT_WATCHED_CATEGORY,
-                        String.isNotBlank(record.Default_Risk_Level__c) ? record.Default_Risk_Level__c : DEFAULT_WATCHED_RISK
-                    );
-                }
+        if (String.isBlank(targetObject)) {
+            return new AuditrUtil.ClassificationResult(DEFAULT_WATCHED_CATEGORY, DEFAULT_WATCHED_RISK);
+        }
+        for (Auditr_Watched_Object__mdt record : getWatchedRegistry()) {
+            if (matchesObjectApiName(record, targetObject)) {
+                return buildDefaultClassification(record);
             }
         }
         return new AuditrUtil.ClassificationResult(DEFAULT_WATCHED_CATEGORY, DEFAULT_WATCHED_RISK);
     }
 
+    private static Boolean matchesObjectApiName(Auditr_Watched_Object__mdt record, String targetObject) {
+        return record != null
+            && String.isNotBlank(record.Object_API_Name__c)
+            && record.Object_API_Name__c.trim().equalsIgnoreCase(targetObject.trim());
+    }
+
+    private static AuditrUtil.ClassificationResult buildDefaultClassification(Auditr_Watched_Object__mdt record) {
+        String category = String.isNotBlank(record.Category__c) ? record.Category__c : DEFAULT_WATCHED_CATEGORY;
+        String risk = String.isNotBlank(record.Default_Risk_Level__c) ? record.Default_Risk_Level__c : DEFAULT_WATCHED_RISK;
+        return new AuditrUtil.ClassificationResult(category, risk);
+    }
+
+    private void processSingleInput(HistoryRowInput input, List<Auditr_Entry__c> emitted) {
+        if (!isValidInput(input) || isIgnoredHistoryToken(input.fieldName)) {
+            return;
+        }
+        String canonicalField = canonicalizeFieldName(input.fieldName);
+        if (pendingGroup != null && !pendingGroup.isSameRun(input, canonicalField)) {
+            emitted.add(buildEntryFromGroup(pendingGroup));
+            pendingGroup = null;
+        }
+        String anchoredHistoryId = resolveSaveRunAnchorId(input, canonicalField);
+        if (!isWatchedField(canonicalField)) {
+            return;
+        }
+        if (pendingGroup == null) {
+            pendingGroup = new PendingGroup(anchoredHistoryId, input, canonicalField);
+        } else {
+            pendingGroup.addField(canonicalField);
+        }
+    }
+
+    private static Boolean isValidInput(HistoryRowInput input) {
+        return input != null
+            && String.isNotBlank(input.historyId)
+            && String.isNotBlank(input.parentId)
+            && String.isNotBlank(input.fieldName)
+            && input.occurredAt != null;
+    }
+
+    private static Boolean isIgnoredHistoryToken(String rawFieldName) {
+        return String.isNotBlank(rawFieldName)
+            && IGNORED_HISTORY_FIELDS.contains(rawFieldName.trim().toLowerCase());
+    }
+
+    private static Boolean isIsolatedToken(String canonicalField) {
+        return String.isNotBlank(canonicalField)
+            && ISOLATED_EVENT_TOKENS.contains(canonicalField.trim().toLowerCase());
+    }
+
+    private String resolveSaveRunAnchorId(HistoryRowInput input, String canonicalField) {
+        if (isIsolatedToken(canonicalField)) {
+            currentRunAnchor = null;
+            return input.historyId;
+        }
+        if (currentRunAnchor == null || !currentRunAnchor.matches(input)) {
+            currentRunAnchor = new SaveRunAnchor(input);
+        }
+        return currentRunAnchor.firstHistoryId;
+    }
+
     private String canonicalizeFieldName(String rawFieldName) {
         String trimmed = rawFieldName.trim();
         String lower = trimmed.toLowerCase();
-        if (lower != 'created' && !validFieldsLower.contains(lower) && validFieldsLower.contains(lower + 'id')) {
+        if (lower == 'textname') {
+            return 'Name';
+        }
+        if (MERGE_HISTORY_FIELDS.contains(lower)) {
+            return 'record_merged';
+        }
+        if (lower == 'locked') {
+            return 'record_locked';
+        }
+        if (lower == 'unlocked') {
+            return 'record_unlocked';
+        }
+        if (!isIsolatedToken(lower) && !validFieldsLower.contains(lower) && validFieldsLower.contains(lower + 'id')) {
             return trimmed + 'Id';
         }
         return trimmed;
     }
 
-    private Boolean isWatchedField(String fieldName) {
-        if (watchedFieldsLower.isEmpty()) {
+    private Boolean isWatchedField(String canonicalField) {
+        if (watchedFieldsLower.isEmpty() || isIsolatedToken(canonicalField)) {
             return true;
         }
-        String normalized = fieldName.trim().toLowerCase();
-        return normalized == 'created' || watchedFieldsLower.contains(normalized);
+        return watchedFieldsLower.contains(canonicalField.trim().toLowerCase());
     }
 
     private Auditr_Entry__c buildEntryFromGroup(PendingGroup grp) {
@@ -554,26 +517,19 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
         String actorUsername = String.isNotBlank(grp.actorUsername)
             ? grp.actorUsername
             : AuditrUtil.DEFAULT_ACTOR_USERNAME;
-        Boolean isCreatedOnly = (grp.fields.size() == 1 && grp.fields[0].equalsIgnoreCase('created'));
-        String actionCode;
-        String displayText;
-        if (isCreatedOnly) {
-            actionCode = 'record_created';
-            displayText = 'Created ' + resolvedObject + ' record (' + grp.parentId + ')';
-        } else if (grp.fields.size() == 1) {
-            actionCode = ('field_changed:' + grp.fields[0]).left(100);
-            displayText = ('Changed ' + grp.fields[0] + ' on ' + resolvedObject + ' (' + grp.parentId + ')').left(1000);
-        } else {
-            actionCode = 'fields_changed:' + grp.fields.size();
-            displayText = ('Changed ' + String.join(grp.fields, ', ') + ' on ' + resolvedObject + ' (' + grp.parentId + ')').left(1000);
-        }
+        ActionDescriptor actionDesc = buildActionDescriptor(grp, resolvedObject);
         String sectionValue = ('Watched Object: ' + resolvedObject).left(100);
-        String inferredDelegate = resolveInferredDelegateUser(grp.actorId, actorUsername, grp.occurredAt);
+        String inferredDelegate = AuditrLoginAsCorrelator.resolveDelegateUser(
+            cachedLoginAsWindows,
+            grp.actorId,
+            actorUsername,
+            grp.occurredAt
+        );
         String responsibleUsername = String.isNotBlank(inferredDelegate) ? inferredDelegate : actorUsername;
         AuditrUtil.ClassificationResult classification = AuditrUtil.classifyWatchedObject(
             resolvedObject,
             grp.fields,
-            actionCode,
+            actionDesc.actionCode,
             sectionValue,
             inferredDelegate,
             defaultCategory,
@@ -602,165 +558,166 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
             Actor_Username__c = actorUsername,
             Delegate_User__c = inferredDelegate,
             Responsible_Username__c = responsibleUsername,
-            Action_Code__c = actionCode,
+            Action_Code__c = actionDesc.actionCode,
             Section__c = sectionValue,
             Category__c = classification.category,
             Risk_Level__c = classification.riskLevel,
-            Display__c = displayText,
+            Display__c = actionDesc.displayText,
             Payload__c = JSON.serialize(payload)
         );
     }
 
+    private class ActionDescriptor {
+        public String actionCode;
+        public String displayText;
+
+        ActionDescriptor(String actionCode, String displayText) {
+            this.actionCode = actionCode;
+            this.displayText = displayText;
+        }
+    }
+
+    private static ActionDescriptor buildActionDescriptor(PendingGroup grp, String resolvedObject) {
+        if (grp.fields.size() == 1) {
+            String singleToken = grp.fields[0].toLowerCase();
+            if (singleToken == 'created') {
+                return new ActionDescriptor(
+                    'record_created',
+                    'Created ' + resolvedObject + ' record (' + grp.parentId + ')'
+                );
+            }
+            if (singleToken == 'record_merged') {
+                return new ActionDescriptor(
+                    'record_merged',
+                    'Merged ' + resolvedObject + ' record (' + grp.parentId + ')'
+                );
+            }
+            if (singleToken == 'record_locked') {
+                return new ActionDescriptor(
+                    'record_locked',
+                    'Locked ' + resolvedObject + ' record (' + grp.parentId + ')'
+                );
+            }
+            if (singleToken == 'record_unlocked') {
+                return new ActionDescriptor(
+                    'record_unlocked',
+                    'Unlocked ' + resolvedObject + ' record (' + grp.parentId + ')'
+                );
+            }
+            return new ActionDescriptor(
+                ('field_changed:' + grp.fields[0]).left(100),
+                ('Changed ' + grp.fields[0] + ' on ' + resolvedObject + ' (' + grp.parentId + ')').left(1000)
+            );
+        }
+        return new ActionDescriptor(
+            'fields_changed:' + grp.fields.size(),
+            ('Changed ' + String.join(grp.fields, ', ') + ' on ' + resolvedObject + ' (' + grp.parentId + ')').left(1000)
+        );
+    }
+
     private void ensureLoginAsWindowsLoaded(List<HistoryRowInput> inputs) {
-        if (testLoginAsWindowsOverride != null || cachedLoginAsWindows != null) {
+        if (cachedLoginAsWindows != null) {
             return;
         }
         DateTime earliest = null;
+        DateTime latest = null;
         for (HistoryRowInput input : inputs) {
-            if (input != null && input.occurredAt != null && (earliest == null || input.occurredAt < earliest)) {
+            if (input == null || input.occurredAt == null) {
+                continue;
+            }
+            if (earliest == null || input.occurredAt < earliest) {
                 earliest = input.occurredAt;
             }
+            if (latest == null || input.occurredAt > latest) {
+                latest = input.occurredAt;
+            }
         }
-        DateTime queryStart = (earliest != null ? earliest : System.now()).addMinutes(-DEFAULT_LOGIN_AS_MAX_MINUTES);
-        cachedLoginAsWindows = loadLoginAsWindowsSince(queryStart);
+        cachedLoginAsWindows = AuditrLoginAsCorrelator.loadWindowsForRange(earliest, latest);
     }
 
-    private String resolveInferredDelegateUser(Id actorId, String actorUsername, DateTime occurredAt) {
-        List<LoginAsWindow> windows = (testLoginAsWindowsOverride != null)
-            ? testLoginAsWindowsOverride
-            : cachedLoginAsWindows;
-        if (windows == null || windows.isEmpty() || occurredAt == null) {
-            return null;
+    private static List<String> buildCandidateHistoryNames(String objectApiName) {
+        List<String> candidateHistoryNames = new List<String>();
+        if (objectApiName.endsWithIgnoreCase('__c')) {
+            String baseName = objectApiName.substring(0, objectApiName.length() - 3);
+            candidateHistoryNames.add(baseName + '__History');
+        } else {
+            candidateHistoryNames.add(objectApiName + 'FieldHistory');
+            candidateHistoryNames.add(objectApiName + 'History');
         }
-        for (LoginAsWindow win : windows) {
-            if (win != null && win.matches(actorId, actorUsername, occurredAt)) {
-                return win.delegateUser;
-            }
-        }
-        return null;
+        return candidateHistoryNames;
     }
 
-    private static List<LoginAsWindow> loadLoginAsWindowsSince(DateTime queryStart) {
-        List<LoginAsWindow> windows = new List<LoginAsWindow>();
-        Set<String> loginActions = new Set<String>{ 'suorgadminlogin', 'sunetworkadminlogin' };
-        Set<String> logoutActions = new Set<String>{ 'suorgadminlogout', 'sunetworkadminlogout' };
-        Map<String, LoginAsWindow> openByActorKey = new Map<String, LoginAsWindow>();
-        Set<String> seenSourceIds = new Set<String>();
-
-        for (Auditr_Entry__c entry : [
-            SELECT Source_Record_Id__c, Action_Code__c, Actor__c, Actor_Username__c, Delegate_User__c, Occurred_At__c
-            FROM Auditr_Entry__c
-            WHERE Source__c = :AuditrUtil.DEFAULT_SOURCE
-              AND Occurred_At__c >= :queryStart
-              AND Delegate_User__c != NULL
-            WITH SYSTEM_MODE
-            ORDER BY Occurred_At__c ASC, Name ASC
-        ]) {
-            if (String.isNotBlank(entry.Source_Record_Id__c)) {
-                seenSourceIds.add(entry.Source_Record_Id__c);
-            }
-            applyLoginAsSignal(
-                windows,
-                openByActorKey,
-                loginActions,
-                logoutActions,
-                entry.Action_Code__c,
-                entry.Actor__c,
-                entry.Actor_Username__c,
-                entry.Delegate_User__c,
-                entry.Occurred_At__c
-            );
+    private static Boolean populateHistoryTableDetails(HistoryMetadata meta, Schema.SObjectType historyType) {
+        if (historyType == null) {
+            return false;
         }
-
-        if (!Test.isRunningTest()) {
-            for (SetupAuditTrail sat : [
-                SELECT Id, Action, CreatedById, CreatedBy.Username, DelegateUser, CreatedDate
-                FROM SetupAuditTrail
-                WHERE CreatedDate >= :queryStart
-                  AND DelegateUser != NULL
-                ORDER BY CreatedDate ASC, Id ASC
-            ]) {
-                if (seenSourceIds.contains(String.valueOf(sat.Id))) {
-                    continue;
-                }
-                String actorUser = (sat.CreatedBy != null) ? sat.CreatedBy.Username : null;
-                applyLoginAsSignal(
-                    windows,
-                    openByActorKey,
-                    loginActions,
-                    logoutActions,
-                    sat.Action,
-                    sat.CreatedById,
-                    actorUser,
-                    sat.DelegateUser,
-                    sat.CreatedDate
-                );
-            }
+        Schema.DescribeSObjectResult historyDescribe = historyType.getDescribe();
+        Map<String, Schema.SObjectField> historyFields = historyDescribe.fields.getMap();
+        if (!historyFields.containsKey('field') || !historyFields.containsKey('createddate')) {
+            return false;
         }
-        return windows;
+        String parentKey = historyFields.containsKey('parentid')
+            ? 'parentid'
+            : (meta.objectApiName + 'Id').toLowerCase();
+        if (!historyFields.containsKey(parentKey)) {
+            return false;
+        }
+        meta.isHistoryAvailable = true;
+        meta.historyObjectName = historyDescribe.getName();
+        meta.parentFieldName = historyFields.get(parentKey).getDescribe().getName();
+        return true;
+    }
+
+    private static WatchedObjectReadiness evaluateRecordReadiness(
+        Auditr_Watched_Object__mdt record,
+        Map<String, Set<String>> trackedFieldsByObject
+    ) {
+        WatchedObjectReadiness item = new WatchedObjectReadiness();
+        item.developerName = record.DeveloperName;
+        item.label = record.MasterLabel;
+        item.objectApiName = record.Object_API_Name__c;
+        item.isActive = (record.Is_Active__c == true);
+        item.defaultRiskLevel = String.isNotBlank(record.Default_Risk_Level__c)
+            ? record.Default_Risk_Level__c
+            : DEFAULT_WATCHED_RISK;
+        item.category = String.isNotBlank(record.Category__c)
+            ? record.Category__c
+            : DEFAULT_WATCHED_CATEGORY;
+        item.watchedFields = parseWatchedFieldsDisplay(record.Watched_Fields__c);
+        item.missingFields = new List<String>();
+
+        HistoryMetadata meta = resolveHistoryMetadata(record.Object_API_Name__c);
+        item.isObjectValid = meta.isObjectValid;
+        item.isHistoryAvailable = meta.isHistoryAvailable;
+        item.historyObjectName = meta.historyObjectName;
+
+        List<String> untrackedFields = new List<String>();
+        Set<String> trackedLower = new Set<String>();
+        if (meta.isObjectValid) {
+            item.objectApiName = meta.objectApiName;
+            trackedLower = trackedFieldsByObject.get(meta.objectApiName.toLowerCase()) ?? new Set<String>();
+            classifyConfiguredFields(item, meta.validFieldsLower, trackedLower, untrackedFields);
+        }
+        Boolean hasAnyTrackedField = !trackedLower.isEmpty();
+        item.isReady = item.isObjectValid && item.isHistoryAvailable && hasAnyTrackedField
+            && item.missingFields.isEmpty() && untrackedFields.isEmpty();
+        item.statusMessage = buildStatusMessage(item, hasAnyTrackedField, untrackedFields);
+        return item;
     }
 
     @SuppressWarnings('PMD.ExcessiveParameterList')
-    private static void applyLoginAsSignal(
-        List<LoginAsWindow> windows,
-        Map<String, LoginAsWindow> openByActorKey,
-        Set<String> loginActions,
-        Set<String> logoutActions,
-        String actionCode,
-        Id actorId,
-        String actorUsername,
-        String delegateUser,
-        DateTime occurredAt
+    private static void classifyConfiguredFields(
+        WatchedObjectReadiness item,
+        Set<String> validFieldsLower,
+        Set<String> trackedLower,
+        List<String> untrackedFields
     ) {
-        if (String.isBlank(delegateUser) || occurredAt == null) {
-            return;
-        }
-        String actorKey = actorId != null
-            ? String.valueOf(actorId)
-            : (String.isNotBlank(actorUsername) ? actorUsername.trim().toLowerCase() : null);
-        if (String.isBlank(actorKey)) {
-            return;
-        }
-        String normalizedAction = String.isNotBlank(actionCode) ? actionCode.trim().toLowerCase() : '';
-        if (loginActions.contains(normalizedAction)) {
-            LoginAsWindow prevOpen = openByActorKey.get(actorKey);
-            if (prevOpen != null && prevOpen.endAt > occurredAt) {
-                prevOpen.endAt = occurredAt;
-            }
-            LoginAsWindow nextWin = new LoginAsWindow(
-                actorId,
-                actorUsername,
-                delegateUser,
-                occurredAt,
-                occurredAt.addMinutes(DEFAULT_LOGIN_AS_MAX_MINUTES)
-            );
-            windows.add(nextWin);
-            openByActorKey.put(actorKey, nextWin);
-        } else if (logoutActions.contains(normalizedAction)) {
-            LoginAsWindow openWin = openByActorKey.remove(actorKey);
-            if (openWin != null) {
-                openWin.endAt = occurredAt;
-            } else {
-                windows.add(new LoginAsWindow(
-                    actorId,
-                    actorUsername,
-                    delegateUser,
-                    occurredAt.addMinutes(-DEFAULT_LOGIN_AS_MAX_MINUTES),
-                    occurredAt
-                ));
-            }
-        } else {
-            LoginAsWindow openWin = openByActorKey.get(actorKey);
-            if (openWin == null || occurredAt > openWin.endAt) {
-                LoginAsWindow activityWin = new LoginAsWindow(
-                    actorId,
-                    actorUsername,
-                    delegateUser,
-                    occurredAt.addMinutes(-5),
-                    occurredAt.addMinutes(30)
-                );
-                windows.add(activityWin);
-                openByActorKey.put(actorKey, activityWin);
+        for (String configuredField : item.watchedFields) {
+            String lowerField = configuredField.toLowerCase();
+            if (!validFieldsLower.contains(lowerField)) {
+                item.missingFields.add(configuredField);
+            } else if (!trackedLower.contains(lowerField)) {
+                untrackedFields.add(configuredField);
             }
         }
     }
@@ -829,7 +786,8 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
             return 'Object "' + item.objectApiName + '" was not found in this org.';
         }
         if (!item.isHistoryAvailable || !hasAnyTrackedField) {
-            return 'No fields have Field History Tracking enabled on ' + item.objectApiName + '. Enable it in Object Manager -> Fields & Relationships -> Set History Tracking.';
+            return 'No fields have Field History Tracking enabled on ' + item.objectApiName +
+                '. Enable it in Object Manager -> Fields & Relationships -> Set History Tracking.';
         }
         if (!item.missingFields.isEmpty()) {
             return 'Unknown field(s) on ' + item.objectApiName + ': ' + String.join(item.missingFields, ', ') + '.';
@@ -842,6 +800,9 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
     }
 
     private static Map<String, Set<String>> queryTrackedFieldsByObject(List<Auditr_Watched_Object__mdt> records) {
+        if (testTrackedFieldsOverride != null) {
+            return testTrackedFieldsOverride;
+        }
         Map<String, Set<String>> trackedByObj = new Map<String, Set<String>>();
         Set<String> objectNames = new Set<String>();
         for (Auditr_Watched_Object__mdt rec : records) {
@@ -852,6 +813,7 @@ public with sharing class AuditrWatchedObjectSource extends AuditrSource {
         if (objectNames.isEmpty()) {
             return trackedByObj;
         }
+        /* sfge-disable-next-line ApexFlsViolation */
         for (FieldDefinition fd : [
             SELECT EntityDefinition.QualifiedApiName, QualifiedApiName
             FROM FieldDefinition

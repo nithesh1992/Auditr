@@ -1,6 +1,6 @@
 # Architecture, Data Model & Considerations
 
-Auditr is intentionally compact — 13 production Apex classes, 3 triggers, 4 Lightning Web Components, 3 custom objects, 1 custom permission, and 4 custom metadata types — so your security and engineering teams can audit the entire codebase in minutes.
+Auditr is intentionally compact — 14 production Apex classes, 3 triggers, 4 Lightning Web Components, 3 custom objects, 1 custom permission, and 4 custom metadata types — so your security and engineering teams can audit the entire codebase in minutes.
 
 ---
 
@@ -10,9 +10,9 @@ Auditr is intentionally compact — 13 production Apex classes, 3 triggers, 4 Li
 force-app/main/default/Auditr/
 ├── applications/        Auditr Lightning App (branded with Auditr_Logo)
 ├── classes/             AuditrSource · AuditrSetupAuditTrailSource · AuditrWatchedObjectSource
-│                        AuditrUtil · AuditrEntryTriggerHandler · AuditrSyncBatch
-│                        AuditrReclassifyBatch · AuditrPurgeBatch · AuditrController
-│                        AuditrChangeLogController · AuditrChangeLogBatch
+│                        AuditrLoginAsCorrelator · AuditrUtil · AuditrEntryTriggerHandler
+│                        AuditrSyncBatch · AuditrReclassifyBatch · AuditrPurgeBatch
+│                        AuditrController · AuditrChangeLogController · AuditrChangeLogBatch
 │                        AuditrChangeLogTriggerHandler · AuditrChangeLogItemTriggerHandler
 │                        + 8 test classes (AuditrSourceTest, AuditrTestDataFactory, etc.)
 ├── triggers/            AuditrEntryTrigger · AuditrChangeLogTrigger · AuditrChangeLogItemTrigger
@@ -54,10 +54,12 @@ flowchart LR
 1. **Per-Source Watermark Resolution (`AuditrSource.resolveCutoff`)**:
    - Each active `AuditrSource` adapter (`AuditrSetupAuditTrailSource` and each active `AuditrWatchedObjectSource`) resolves its own watermark (`Occurred_At__c` scoped by `Source__c` and `Target_Object__c`) and subtracts its configured `Overlap_Hours__c` (default 48 hours).
    - If no entries exist for that source yet, falls back to `System.now().addDays(-Backfill_Days__c)`.
-2. **Watched Objects Consecutive Grouping & Login-As Correlation (`AuditrWatchedObjectSource`)**:
-   - Groups consecutive `<Object>History` rows sharing the same record, same user, and exact same timestamp into a single `Auditr_Entry__c` (flushing immediately on any intervening row from another user, record, or timestamp, and never merging `created` rows with subsequent updates).
-   - Correlates each history row's actor and timestamp against active `suOrgAdminLogin` / `suOrgAdminLogout` session windows in `SetupAuditTrail` to infer `Delegate_User__c` when an admin modifies data while impersonating another user via *Login As*.
-2. **Deduplication and Partial DML (`Source_Record_Id__c`)**:
+2. **Watched Objects Consecutive Grouping, Special Token Normalization & Login-As Correlation (`AuditrWatchedObjectSource` + `AuditrLoginAsCorrelator`)**:
+   - Groups consecutive `<Object>History` rows sharing the same record, same user, and exact same timestamp into a single `Auditr_Entry__c` (flushing immediately on any intervening row from another user, record, or timestamp).
+   - Anchors `Source_Record_Id__c` on the first `<Object>History.Id` of the consecutive `(parentId, actorId, occurredAt)` save run — even if that first row is an unwatched field — so updating `Watched_Fields__c` later never inserts duplicate `Auditr_Entry__c` records during the 48-hour overlap window.
+   - Normalizes platform-specific `<Object>History.Field` tokens (`TextName` -> `Name`, lookup tokens `Owner`/`Account` -> `OwnerId`/`AccountId`), isolates lifecycle events (`created` -> `record_created`, `accountMerged`/`contactMerged`/`leadMerged` -> `record_merged`, `locked` -> `record_locked`, `unlocked` -> `record_unlocked`), and ignores non-field noise tokens (`feedEvent`, `ownerAccepted`, `ownerAssignment`).
+   - Correlates each history row's actor and timestamp via `AuditrLoginAsCorrelator` against bounded `[earliest - 120m, latest + 5m]` windows from `SetupAuditTrail` (`suOrgAdminLogin`/`suOrgAdminLogout`, `suNetworkAdminLogin`/`suNetworkAdminLogout`, `suloginaccessused`/`suLogout` across both `DelegateUser` and `Display` `"Logged in using Login-As access for <User>"` representations) and active `AuthSession` substitute sessions (`SessionType = 'SubstituteUser'` / `LoginType = 'SysAdmin Switch'`).
+3. **Deduplication and Partial DML (`Source_Record_Id__c`)**:
    - Maps `String.valueOf(SetupAuditTrail.Id)` into `Auditr_Entry__c.Source_Record_Id__c` (`External ID`, `Unique`, `Case Insensitive`).
    - Filters out existing IDs within each batch chunk, inserts new records via `Database.insert(newEntries, false, AccessLevel.SYSTEM_MODE)`, and inspects `Database.SaveResult[]` to record accurate successful insert counts and log any failed rows.
 3. **Privilege & Permission Boundary (`Auditr_Admin_Access`)**:
@@ -95,7 +97,7 @@ flowchart LR
 | **Target Record ID** | `Target_Record_Id__c` | Text(18) | 18-character Salesforce record ID of the modified watched record. |
 
 ::: info Pluggable Sources & Watched Objects Privacy by Design
-`AuditrWatchedObjectSource` queries only `Id`, `ParentId`/`<Object>Id`, `Field`, `CreatedById`, and `CreatedDate` from standard Salesforce `<Object>History` / `<Custom>__History` tables — **`OldValue` and `NewValue` are never queried or stored**, preventing the audit log from becoming a secondary leak path for confidential data. Consecutive field changes in the same save transaction (same record, same user, exact same timestamp, with no intervening row) are grouped into a single `Auditr_Entry__c` record. Note that Salesforce Field History timestamps have 1-second precision, tracks up to 20 fields per object without Shield, and does not capture record reads/exports.
+`AuditrWatchedObjectSource` queries only `Id`, `ParentId`/`<Object>Id`, `Field`, `CreatedById`, and `CreatedDate` from standard Salesforce `<Object>History` / `<Custom>__History` tables — **`OldValue` and `NewValue` are never queried or stored**, preventing the audit log from becoming a secondary leak path for confidential data. Consecutive field changes in the same save transaction (same record, same user, exact same timestamp, with no intervening row) are grouped into a single `Auditr_Entry__c` record anchored to the save run's first `<Object>History.Id`. Note that Salesforce Field History timestamps have 1-second precision, tracks up to 20 fields per object without Shield, does not capture record reads/exports, and **does not generate `<Object>History` rows on `after delete`** (and if a record is deleted and hard-purged from the Recycle Bin before the next batch sync, its `<Object>History` rows are cascade-deleted by Salesforce prior to ingestion).
 :::
 
 ---

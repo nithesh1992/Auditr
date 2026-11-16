@@ -4,11 +4,11 @@
 public with sharing class AuditrReclassifyBatch implements Database.Batchable<SObject>, Database.Stateful {
     private final Boolean onlyUnclassified;
 
-    public class AuditrReclassifyException extends Exception {}
-
     @TestVisible private Integer totalUpdated = 0;
     @TestVisible private Integer totalFailed = 0;
     @TestVisible private String firstErrorMessage;
+
+    public class AuditrReclassifyException extends Exception {}
 
     /**
      * @description Default constructor that re-evaluates only Unclassified Auditr_Entry__c records.
@@ -56,27 +56,7 @@ public with sharing class AuditrReclassifyBatch implements Database.Batchable<SO
     public void execute(Database.BatchableContext context, List<SObject> scope) {
         List<Auditr_Entry__c> entriesToUpdate = new List<Auditr_Entry__c>();
         for (Auditr_Entry__c entry : (List<Auditr_Entry__c>) scope) {
-            AuditrUtil.ClassificationResult result;
-            if (entry.Source__c == AuditrUtil.DATA_CHANGE_SOURCE) {
-                AuditrUtil.ClassificationResult defaults = AuditrWatchedObjectSource.getDefaultsForObject(entry.Target_Object__c);
-                result = AuditrUtil.classifyWatchedObject(
-                    entry.Target_Object__c,
-                    extractChangedFields(entry.Payload__c),
-                    entry.Action_Code__c,
-                    entry.Section__c,
-                    entry.Delegate_User__c,
-                    defaults.category,
-                    defaults.riskLevel
-                );
-            } else {
-                result = AuditrUtil.classify(
-                    entry.Source__c,
-                    entry.Action_Code__c,
-                    entry.Section__c,
-                    entry.Namespace_Prefix__c,
-                    entry.Delegate_User__c
-                );
-            }
+            AuditrUtil.ClassificationResult result = classifyEntry(entry);
             if (entry.Category__c != result.category || entry.Risk_Level__c != result.riskLevel) {
                 entry.Category__c = result.category;
                 entry.Risk_Level__c = result.riskLevel;
@@ -84,24 +64,53 @@ public with sharing class AuditrReclassifyBatch implements Database.Batchable<SO
             }
         }
         if (!entriesToUpdate.isEmpty()) {
-            Database.SaveResult[] saveResults = Database.update(entriesToUpdate, false, AccessLevel.SYSTEM_MODE);
-            for (Integer i = 0; i < saveResults.size(); i++) {
-                Database.SaveResult sr = saveResults[i];
-                if (sr.isSuccess()) {
-                    totalUpdated++;
-                } else {
-                    totalFailed++;
-                    for (Database.Error err : sr.getErrors()) {
-                        if (firstErrorMessage == null) {
-                            firstErrorMessage = err.getMessage();
-                        }
-                        System.debug(
-                            LoggingLevel.ERROR,
-                            'AuditrReclassifyBatch failed to update entry ' + entriesToUpdate[i].Id + ': ' + err.getMessage()
-                        );
-                    }
-                }
+            recordUpdateResults(entriesToUpdate, Database.update(entriesToUpdate, false, AccessLevel.SYSTEM_MODE));
+        }
+    }
+
+    private static AuditrUtil.ClassificationResult classifyEntry(Auditr_Entry__c entry) {
+        if (entry.Source__c == AuditrUtil.DATA_CHANGE_SOURCE) {
+            AuditrUtil.ClassificationResult defaults = AuditrWatchedObjectSource.getDefaultsForObject(entry.Target_Object__c);
+            return AuditrUtil.classifyWatchedObject(
+                entry.Target_Object__c,
+                extractChangedFields(entry.Payload__c),
+                entry.Action_Code__c,
+                entry.Section__c,
+                entry.Delegate_User__c,
+                defaults.category,
+                defaults.riskLevel
+            );
+        }
+        return AuditrUtil.classify(
+            entry.Source__c,
+            entry.Action_Code__c,
+            entry.Section__c,
+            entry.Namespace_Prefix__c,
+            entry.Delegate_User__c
+        );
+    }
+
+    private void recordUpdateResults(List<Auditr_Entry__c> entriesToUpdate, Database.SaveResult[] saveResults) {
+        for (Integer i = 0; i < saveResults.size(); i++) {
+            Database.SaveResult sr = saveResults[i];
+            if (sr.isSuccess()) {
+                totalUpdated++;
+            } else {
+                totalFailed++;
+                logUpdateErrors(entriesToUpdate[i].Id, sr.getErrors());
             }
+        }
+    }
+
+    private void logUpdateErrors(Id entryId, List<Database.Error> errors) {
+        for (Database.Error err : errors) {
+            if (firstErrorMessage == null) {
+                firstErrorMessage = err.getMessage();
+            }
+            System.debug(
+                LoggingLevel.ERROR,
+                'AuditrReclassifyBatch failed to update entry ' + entryId + ': ' + err.getMessage()
+            );
         }
     }
 

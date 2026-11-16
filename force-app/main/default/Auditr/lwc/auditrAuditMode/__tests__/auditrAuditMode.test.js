@@ -349,7 +349,7 @@ describe('c-auditr-audit-mode', () => {
         expect(element.shadowRoot.querySelector('.load-more-button')).toBeNull();
     });
 
-    it('decorates Watched Object entries with targetRecordUrl and targetRecordLabel', async () => {
+    it('decorates Watched Object entries with targetRecordUrl, targetRecordLabel, and inferred delegate label', async () => {
         const element = createElement('c-auditr-audit-mode', { is: AuditrAuditMode });
         document.body.appendChild(element);
         getAuditEntries.emit({
@@ -359,6 +359,7 @@ describe('c-auditr-audit-mode', () => {
                     source: 'DataChange',
                     targetObject: 'Account',
                     targetRecordId: '001000000000001AAA',
+                    delegateUser: 'admin@example.com',
                     isPackaged: false
                 }
             ],
@@ -373,6 +374,7 @@ describe('c-auditr-audit-mode', () => {
         const datatable = element.shadowRoot.querySelector('lightning-datatable');
         expect(datatable.data[0].targetRecordUrl).toBe('/001000000000001AAA');
         expect(datatable.data[0].targetRecordLabel).toBe('Account (001000000000001AAA)');
+        expect(datatable.data[0].delegateUser).toBe('admin@example.com (Inferred)');
         expect(datatable.data[0].changeRequestDisplay).toBe('Investigation Only');
     });
 });

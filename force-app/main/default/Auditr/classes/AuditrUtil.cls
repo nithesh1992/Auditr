@@ -219,20 +219,7 @@ public with sharing class AuditrUtil {
         String fallbackRiskLevel
     ) {
         for (Auditr_Rule__mdt rule : getActiveRules()) {
-            String ruleSource = String.isNotBlank(rule.Source__c) ? rule.Source__c.trim() : DEFAULT_SOURCE;
-            if (!ruleSource.equalsIgnoreCase(DATA_CHANGE_SOURCE)) {
-                continue;
-            }
-            if (rule.Match_Target__c == 'ChangedField') {
-                if (matchesAnyField(changedFields, rule.Match_Operator__c, rule.Match_Value__c)) {
-                    return new ClassificationResult(rule.Category__c, rule.Risk_Level__c);
-                }
-                continue;
-            }
-            String target = (rule.Match_Target__c == 'TargetObject')
-                ? targetObject
-                : resolveTargetValue(rule.Match_Target__c, actionCode, section, null, delegateUser);
-            if (matchesRule(target, rule.Match_Operator__c, rule.Match_Value__c)) {
+            if (matchesWatchedObjectRule(rule, targetObject, changedFields, actionCode, section, delegateUser)) {
                 return new ClassificationResult(rule.Category__c, rule.Risk_Level__c);
             }
         }
@@ -240,6 +227,27 @@ public with sharing class AuditrUtil {
             String.isNotBlank(fallbackCategory) ? fallbackCategory : 'Data & Schema',
             String.isNotBlank(fallbackRiskLevel) ? fallbackRiskLevel : 'Medium'
         );
+    }
+
+    @SuppressWarnings('PMD.ExcessiveParameterList')
+    private static Boolean matchesWatchedObjectRule(
+        Auditr_Rule__mdt rule,
+        String targetObject,
+        List<String> changedFields,
+        String actionCode,
+        String section,
+        String delegateUser
+    ) {
+        if (!DATA_CHANGE_SOURCE.equalsIgnoreCase(rule.Source__c)) {
+            return false;
+        }
+        if (rule.Match_Target__c == 'ChangedField') {
+            return matchesAnyField(changedFields, rule.Match_Operator__c, rule.Match_Value__c);
+        }
+        String target = (rule.Match_Target__c == 'TargetObject')
+            ? targetObject
+            : resolveTargetValue(rule.Match_Target__c, actionCode, section, null, delegateUser);
+        return matchesRule(target, rule.Match_Operator__c, rule.Match_Value__c);
     }
 
     /**

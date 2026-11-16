@@ -5,12 +5,17 @@ public with sharing class AuditrController {
     public static final String SCHEDULED_JOB_NAME = 'Auditr_Daily_Sync';
     public static final String SCHEDULED_PURGE_JOB_NAME = 'Auditr_Daily_Purge';
     public static final Integer DEFAULT_PURGE_HOUR = 3;
+    public static final String CUSTOM_PERM_ADMIN_ACCESS = 'Auditr_Admin_Access';
+    public static final String ERROR_ADMIN_ACCESS_REQUIRED = 'Auditr Admin access is required for Control Center operations.';
     private static final Integer STALE_SYNC_HOURS = 36;
     private static final Integer TOTAL_COUNT_CAP = 25000;
     private static final Integer KPI_COUNT_CAP = 5000;
     private static final Integer UNCLASSIFIED_COUNT_CAP = 10000;
     private static final Integer UNCLASSIFIED_WINDOW_DAYS = 30;
     private static final Integer RECENT_JOBS_LIMIT = 10;
+
+    @TestVisible
+    private static Boolean testAdminAccessOverride;
 
     /** @description Summary KPIs for the Auditr Home At-a-Glance header. */
     public class AtAGlanceDTO {
@@ -303,12 +308,6 @@ public with sharing class AuditrController {
         requireAdminAccess();
         abortScheduledJobsByPrefix(SCHEDULED_PURGE_JOB_NAME);
     }
-
-    public static final String CUSTOM_PERM_ADMIN_ACCESS = 'Auditr_Admin_Access';
-    public static final String ERROR_ADMIN_ACCESS_REQUIRED = 'Auditr Admin access is required for Control Center operations.';
-
-    @TestVisible
-    private static Boolean testAdminAccessOverride;
 
     private static void requireAdminAccess() {
         Boolean hasAccess = (testAdminAccessOverride != null)

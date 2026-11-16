@@ -8,12 +8,13 @@ public with sharing class AuditrChangeLogBatch implements Database.Batchable<SOb
     private final Id changeLogId;
     private final Set<Id> selectedEntryIds;
 
-    public class AuditrChangeLogBatchException extends Exception {}
-
     @TestVisible private Integer totalAttempted = 0;
     @TestVisible private Integer totalCitationsInserted = 0;
     @TestVisible private Integer totalFailedCitations = 0;
     @TestVisible private String firstErrorMessage;
+
+    /** @description Exception thrown when change log packaging encounters an insert failure. */
+    public class AuditrChangeLogBatchException extends Exception {}
 
     /**
      * @description Filter-driven packaging: scope is resolved from the target log's Window_Start__c, Window_End__c, and Target_Actor__c.

@@ -7,6 +7,13 @@
  * Control Center job monitoring.
  */
 public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>, Database.Stateful, Schedulable {
+    private final AuditrSource source;
+
+    @TestVisible private Integer totalSourceProcessed = 0;
+    @TestVisible private Integer totalSuccessfullyInserted = 0;
+    @TestVisible private Integer totalFailedInserts = 0;
+    @TestVisible private String firstInsertErrorMessage;
+
     public class AuditrSyncException extends Exception {}
 
     /** @description Structured result of an ingestion slice. */
@@ -15,13 +22,6 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
         public Integer failedCount = 0;
         public String firstErrorMessage;
     }
-
-    private final AuditrSource source;
-
-    @TestVisible private Integer totalSourceProcessed = 0;
-    @TestVisible private Integer totalSuccessfullyInserted = 0;
-    @TestVisible private Integer totalFailedInserts = 0;
-    @TestVisible private String firstInsertErrorMessage;
 
     /**
      * @description Default constructor ingesting Setup Audit Trail (backward compatible).
@@ -126,10 +126,23 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
      */
     public static IngestResult insertNewEntries(List<Auditr_Entry__c> candidates, String sourceKey) {
         IngestResult result = new IngestResult();
-        if (candidates == null || candidates.isEmpty()) {
+        List<Auditr_Entry__c> newEntries = filterNewEntries(candidates);
+        if (newEntries.isEmpty()) {
             return result;
         }
 
+        Database.SaveResult[] saveResults = Database.insert(newEntries, false, AccessLevel.SYSTEM_MODE);
+        for (Integer i = 0; i < saveResults.size(); i++) {
+            recordInsertResult(result, saveResults[i], newEntries[i].Source_Record_Id__c, sourceKey);
+        }
+        return result;
+    }
+
+    private static List<Auditr_Entry__c> filterNewEntries(List<Auditr_Entry__c> candidates) {
+        List<Auditr_Entry__c> newEntries = new List<Auditr_Entry__c>();
+        if (candidates == null || candidates.isEmpty()) {
+            return newEntries;
+        }
         Set<String> candidateSourceIds = new Set<String>();
         for (Auditr_Entry__c entry : candidates) {
             if (String.isNotBlank(entry.Source_Record_Id__c)) {
@@ -137,36 +150,36 @@ public with sharing class AuditrSyncBatch implements Database.Batchable<SObject>
             }
         }
         Set<String> seenSourceIds = queryExistingSourceIds(candidateSourceIds);
-        List<Auditr_Entry__c> newEntries = new List<Auditr_Entry__c>();
         for (Auditr_Entry__c entry : candidates) {
             if (String.isNotBlank(entry.Source_Record_Id__c) && seenSourceIds.add(entry.Source_Record_Id__c)) {
                 newEntries.add(entry);
             }
         }
-        if (newEntries.isEmpty()) {
-            return result;
-        }
+        return newEntries;
+    }
 
-        Database.SaveResult[] saveResults = Database.insert(newEntries, false, AccessLevel.SYSTEM_MODE);
-        for (Integer i = 0; i < saveResults.size(); i++) {
-            Database.SaveResult sr = saveResults[i];
-            if (sr.isSuccess()) {
-                result.successCount++;
-                continue;
-            }
-            result.failedCount++;
-            for (Database.Error err : sr.getErrors()) {
-                if (result.firstErrorMessage == null) {
-                    result.firstErrorMessage = err.getMessage();
-                }
-                System.debug(
-                    LoggingLevel.ERROR,
-                    'AuditrSyncBatch [' + sourceKey + '] failed to insert row for sourceId ' +
-                    newEntries[i].Source_Record_Id__c + ': ' + err.getMessage()
-                );
-            }
+    @SuppressWarnings('PMD.ExcessiveParameterList')
+    private static void recordInsertResult(
+        IngestResult result,
+        Database.SaveResult sr,
+        String sourceRecordId,
+        String sourceKey
+    ) {
+        if (sr.isSuccess()) {
+            result.successCount++;
+            return;
         }
-        return result;
+        result.failedCount++;
+        for (Database.Error err : sr.getErrors()) {
+            if (result.firstErrorMessage == null) {
+                result.firstErrorMessage = err.getMessage();
+            }
+            System.debug(
+                LoggingLevel.ERROR,
+                'AuditrSyncBatch [' + sourceKey + '] failed to insert row for sourceId ' +
+                sourceRecordId + ': ' + err.getMessage()
+            );
+        }
     }
 
     /**

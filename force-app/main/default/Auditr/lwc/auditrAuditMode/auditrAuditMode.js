@@ -415,8 +415,12 @@ export default class AuditrAuditMode extends LightningElement {
 
     decorateEntryRow(row) {
         const isWatched = row.source === 'DataChange';
+        const delegateDisplay = isWatched && row.delegateUser
+            ? `${row.delegateUser} (Inferred)`
+            : row.delegateUser;
         return {
             ...row,
+            delegateUser: delegateDisplay,
             displayName: row.name,
             recordUrl: `/${row.recordId}`,
             targetRecordUrl: row.targetRecordId ? `/${row.targetRecordId}` : null,
