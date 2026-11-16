@@ -4,9 +4,9 @@
       "path": "force-app/main/default/Auditr",
       "default": true,
       "package": "Auditr",
-      "versionName": "v1.3.0",
-      "versionNumber": "1.3.0.NEXT",
-      "versionDescription": "Extensible multi-source ingestion architecture, Watched Objects (Field History) tracking, and Login-As delegation correlation."
+      "versionName": "v1.3.1",
+      "versionNumber": "1.3.1.NEXT",
+      "versionDescription": "Hardened Login-As correlation (AuditrLoginAsCorrelator), change log packaging lifecycle & filters, SLDS 2 styling hooks, and multi-source sync health monitoring."
     },
     {
       "path": "force-app/test",
@@ -25,6 +25,7 @@
     "Auditr@1.1.1-1": "04tg7000000coobAAA",
     "Auditr@1.2.0-1": "04tg7000000dK8XAAU",
     "Auditr@1.2.1-1": "04tg7000000dLJ7AAM",
-    "Auditr@1.3.0-1": "04tg7000000e1YTAAY"
+    "Auditr@1.3.0-1": "04tg7000000e1YTAAY",
+    "Auditr@1.3.1-1": "04tg7000000gBLdAAM"
   }
 }

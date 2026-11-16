@@ -320,14 +320,17 @@ private class AuditrChangeLogControllerTest {
         Auditr_Entry__c watched = AuditrTestDataFactory.buildEntry(99, null);
         watched.Source__c = 'DataChange';
         Database.insert(watched, AccessLevel.SYSTEM_MODE);
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO small;
+        AuditrChangeLogController.AuditEntriesEnvelopeDTO paged;
 
-        Test.startTest();
-        AuditrChangeLogController.AuditEntriesEnvelopeDTO small =
-            AuditrChangeLogController.getAuditEntries(null, null, null, false, null);
-        AuditrChangeLogController.entryQueryLimit = 2;
-        AuditrChangeLogController.AuditEntriesEnvelopeDTO paged =
-            AuditrChangeLogController.getAuditEntries(null, null, null, false, null);
-        Test.stopTest();
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+            Test.startTest();
+            small = AuditrChangeLogController.getAuditEntries(null, null, null, false, null);
+            AuditrChangeLogController.entryQueryLimit = 2;
+            paged = AuditrChangeLogController.getAuditEntries(null, null, null, false, null);
+            Test.stopTest();
+            AuditrChangeLogController.entryQueryLimit = 200;
+        }
 
         Assert.areEqual(5, small.totalMatchingCount, 'Both sources must be included');
         Assert.areEqual(3, small.totalUnassignedCount, 'Only uncited Setup entries are eligible');
@@ -342,14 +345,16 @@ private class AuditrChangeLogControllerTest {
         watched.Source__c = 'DataChange';
         Database.insert(watched, AccessLevel.SYSTEM_MODE);
         Id changeLogId = [SELECT Id FROM Auditr_Change_Log__c WITH SYSTEM_MODE LIMIT 1].Id;
-        Test.startTest();
-        try {
-            AuditrChangeLogController.packageEntries(changeLogId, new List<Id>{ watched.Id });
-            Assert.fail('Watched selections must not enqueue a no-op packaging job');
-        } catch (AuraHandledException ex) {
-            Assert.isTrue(ex.getMessage().contains('Setup Audit Trail'), 'Server must explain packaging eligibility');
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+            Test.startTest();
+            try {
+                AuditrChangeLogController.packageEntries(changeLogId, new List<Id>{ watched.Id });
+                Assert.fail('Watched selections must not enqueue a no-op packaging job');
+            } catch (AuraHandledException ex) {
+                Assert.isTrue(ex.getMessage().contains('Setup Audit Trail'), 'Server must explain packaging eligibility');
+            }
+            Test.stopTest();
         }
-        Test.stopTest();
         Assert.isNull([SELECT Packaging_Job_Id__c FROM Auditr_Change_Log__c WHERE Id = :changeLogId WITH SYSTEM_MODE].Packaging_Job_Id__c,
             'A rejected selection must not claim a packaging job');
     }
@@ -361,9 +366,11 @@ private class AuditrChangeLogControllerTest {
         Database.insert(lowRisk, AccessLevel.SYSTEM_MODE);
         Id changeLogId = [SELECT Id FROM Auditr_Change_Log__c WITH SYSTEM_MODE LIMIT 1].Id;
 
-        Test.startTest();
-        AuditrChangeLogController.packageFilteredEntries(changeLogId, null, null, null, true);
-        Test.stopTest();
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+            Test.startTest();
+            AuditrChangeLogController.packageFilteredEntries(changeLogId, null, null, null, true);
+            Test.stopTest();
+        }
         Assert.areEqual(4, [SELECT COUNT() FROM Auditr_Change_Log_Item__c WHERE Change_Log__c = :changeLogId WITH SYSTEM_MODE],
             'Only seeded High risk entries may be cited');
         Assert.areEqual(0, [SELECT COUNT() FROM Auditr_Change_Log_Item__c WHERE Entry__c = :lowRisk.Id WITH SYSTEM_MODE],
@@ -374,17 +381,19 @@ private class AuditrChangeLogControllerTest {
     private static void shouldRejectSecondPackagingRequest_WhenJobIsQueued() {
         Id changeLogId = [SELECT Id FROM Auditr_Change_Log__c WITH SYSTEM_MODE LIMIT 1].Id;
         Id entryId = [SELECT Id FROM Auditr_Entry__c WITH SYSTEM_MODE LIMIT 1].Id;
-        Test.startTest();
-        Id firstJob = AuditrChangeLogController.packageEntries(changeLogId, new List<Id>{ entryId });
-        try {
-            AuditrChangeLogController.packageEntries(changeLogId, new List<Id>{ entryId });
-            Assert.fail('Second request must not overwrite the active job pointer');
-        } catch (AuraHandledException ex) {
-            Assert.isNotNull(ex.getMessage(), 'An active-job error must be surfaced');
+        System.runAs(new User(Id = UserInfo.getUserId())) {
+            Test.startTest();
+            Id firstJob = AuditrChangeLogController.packageEntries(changeLogId, new List<Id>{ entryId });
+            try {
+                AuditrChangeLogController.packageEntries(changeLogId, new List<Id>{ entryId });
+                Assert.fail('Second request must not overwrite the active job pointer');
+            } catch (AuraHandledException ex) {
+                Assert.isNotNull(ex.getMessage(), 'An active-job error must be surfaced');
+            }
+            Assert.areEqual(firstJob, (Id) [SELECT Packaging_Job_Id__c FROM Auditr_Change_Log__c WHERE Id = :changeLogId WITH SYSTEM_MODE].Packaging_Job_Id__c,
+                'The original job must retain ownership');
+            Test.stopTest();
         }
-        Assert.areEqual(firstJob, (Id) [SELECT Packaging_Job_Id__c FROM Auditr_Change_Log__c WHERE Id = :changeLogId WITH SYSTEM_MODE].Packaging_Job_Id__c,
-            'The original job must retain ownership');
-        Test.stopTest();
     }
 
     @IsTest

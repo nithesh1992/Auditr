@@ -7,7 +7,7 @@ You can install Auditr either as a versioned **Unlocked Package** or by deployin
 ::: code-group
 
 ```bash [Unlocked Package (Recommended)]
-sf package install --package 04tg7000000e1YTAAY --wait 10 --target-org <org-alias>
+sf package install --package 04tg7000000gBLdAAM --wait 10 --target-org <org-alias>
 ```
 
 ```bash [Deploy from Source]
@@ -20,8 +20,8 @@ sf project deploy start --source-dir force-app/main/default/Auditr --target-org 
 
 Or install directly in the browser:
 
-- **Production / Developer Edition**: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000e1YTAAY`
-- **Sandbox / Scratch Org**: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000e1YTAAY`
+- **Production / Developer Edition**: `https://login.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000gBLdAAM`
+- **Sandbox / Scratch Org**: `https://test.salesforce.com/packaging/installPackage.apexp?p0=04tg7000000gBLdAAM`
 
 ## 2. Assign Permission Sets
 
