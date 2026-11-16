@@ -19,6 +19,9 @@
     <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#10B981"/>
     </marker>
+    <marker id="arrowGold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#F59E0B"/>
+    </marker>
     <marker id="arrowMuted" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#64748B"/>
     </marker>
@@ -114,30 +117,30 @@
   <text x="1040" y="460" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#94A3B8">Bound to Change_Request_Id__c</text>
   <text x="1040" y="480" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#34D399">Sealed = Immutable + Auditor Sign-Off</text>
 
-  <!-- Connectors -->
-  <!-- Sources -> Sync / Correlator -->
+  <!-- Clean Orthogonal Connectors -->
+  <!-- Column 1 -> Column 2 -->
   <path d="M 250 150 L 312 150" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
   <path d="M 250 285 L 285 285 L 285 170 L 312 170" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
-  <path d="M 250 315 L 312 282" stroke="#F59E0B" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <path d="M 250 315 L 312 282" stroke="#F59E0B" stroke-width="1.8" stroke-dasharray="4 3" marker-end="url(#arrowGold)"/>
 
-  <!-- Correlator -> Sync -> Rule Engine -->
-  <path d="M 435 235 L 435 212" stroke="#F59E0B" stroke-width="1.8" marker-end="url(#arrow)"/>
-  <path d="M 435 205 L 435 230" stroke="none"/>
-  <path d="M 550 150 L 585 150 L 585 401 L 556 401" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <!-- Correlator -> Sync -->
+  <path d="M 435 235 L 435 212" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrow)"/>
 
-  <!-- Sync & Rules -> Auditr_Entry__c -->
-  <path d="M 550 150 L 617 180" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
-  <path d="M 550 401 L 595 401 L 595 215 L 617 215" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- Column 2 -> Column 3 (Orthogonal, non-overlapping) -->
+  <path d="M 550 150 L 590 150 L 590 190 L 617 190" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M 550 281 L 590 281 L 590 205 L 617 205" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M 550 401 L 604 401 L 604 220 L 617 220" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
+  <path d="M 435 447 L 435 474 L 617 474" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrow)"/>
 
   <!-- Guardrails -> Auditr_Entry__c -->
   <path d="M 735 295 L 735 267" stroke="#64748B" stroke-width="1.6" marker-end="url(#arrowMuted)"/>
 
-  <!-- Auditr_Entry__c -> Workspaces -->
+  <!-- Column 3 (Auditr_Entry__c) -> Column 4 (Workspaces) -->
   <path d="M 845 175 L 882 175 L 882 113 L 912 113" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrow)"/>
-  <path d="M 845 198 L 912 206" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrow)"/>
-  <path d="M 845 220 L 882 220 L 882 306 L 912 306" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <path d="M 845 206 L 912 206" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrow)"/>
+  <path d="M 845 225 L 882 225 L 882 306 L 912 306" stroke="#10B981" stroke-width="1.8" marker-end="url(#arrow)"/>
 
   <!-- Audit Mode -> Change Log -> Cites Auditr_Entry__c -->
   <path d="M 1040 351 L 1040 378" stroke="#10B981" stroke-width="2" marker-end="url(#arrow)"/>
-  <path d="M 920 444 L 870 444 L 870 242 L 852 242" stroke="#34D399" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
+  <path d="M 920 444 L 868 444 L 868 244 L 852 244" stroke="#34D399" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#arrow)"/>
 </svg>
