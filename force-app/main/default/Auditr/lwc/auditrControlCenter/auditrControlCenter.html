@@ -209,12 +209,14 @@
                     </div>
                 </div>
                 <template lwc:if={hasUnclassifiedActions}>
-                    <lightning-datatable
-                        key-field="rowKey"
-                        data={unclassifiedActionRows}
-                        columns={unclassifiedColumns}
-                        hide-checkbox-column
-                    ></lightning-datatable>
+                    <div class="table-container">
+                        <lightning-datatable
+                            key-field="rowKey"
+                            data={unclassifiedActionRows}
+                            columns={unclassifiedColumns}
+                            hide-checkbox-column
+                        ></lightning-datatable>
+                    </div>
                 </template>
                 <template lwc:else>
                     <p class="slds-text-body_small slds-text-color_weak">
@@ -232,12 +234,14 @@
                     </div>
                 </div>
                 <template lwc:if={hasRecentJobs}>
-                    <lightning-datatable
-                        key-field="jobId"
-                        data={status.recentJobs}
-                        columns={jobColumns}
-                        hide-checkbox-column
-                    ></lightning-datatable>
+                    <div class="table-container">
+                        <lightning-datatable
+                            key-field="jobId"
+                            data={status.recentJobs}
+                            columns={jobColumns}
+                            hide-checkbox-column
+                        ></lightning-datatable>
+                    </div>
                 </template>
                 <template lwc:else>
                     <p class="slds-text-body_small slds-text-color_weak">
@@ -256,12 +260,14 @@
                 </div>
             </div>
             <template lwc:if={hasWatchedObjects}>
-                <lightning-datatable
-                    key-field="developerName"
-                    data={watchedObjectRows}
-                    columns={watchedObjectColumns}
-                    hide-checkbox-column
-                ></lightning-datatable>
+                <div class="table-container">
+                    <lightning-datatable
+                        key-field="developerName"
+                        data={watchedObjectRows}
+                        columns={watchedObjectColumns}
+                        hide-checkbox-column
+                    ></lightning-datatable>
+                </div>
             </template>
             <template lwc:else>
                 <p class="slds-text-body_small slds-text-color_weak">
@@ -289,12 +295,14 @@
                     onchange={handleRuleSearchChange}
                 ></lightning-input>
             </div>
-            <lightning-datatable
-                key-field="developerName"
-                data={filteredRules}
-                columns={ruleColumns}
-                hide-checkbox-column
-            ></lightning-datatable>
+            <div class="table-container">
+                <lightning-datatable
+                    key-field="developerName"
+                    data={filteredRules}
+                    columns={ruleColumns}
+                    hide-checkbox-column
+                ></lightning-datatable>
+            </div>
         </div>
     </div>
 </template>

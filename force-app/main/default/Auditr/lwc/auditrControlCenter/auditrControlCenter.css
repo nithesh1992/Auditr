@@ -1,10 +1,15 @@
 .control-center-layout {
     display: flex;
     flex-direction: column;
+    min-width: 0;
     gap: var(--slds-g-spacing-4, 1rem);
 }
 
 .cc-card {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
     background: var(--slds-g-color-surface-container-1, #ffffff);
     border: var(--slds-g-sizing-border-1, 1px) solid var(--slds-g-color-border-1, #e5e5e5);
     border-radius: var(--slds-g-radius-border-2, 0.25rem);
@@ -145,7 +150,7 @@
 
 .middle-row-grid {
     display: grid;
-    grid-template-columns: 5fr 7fr;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
     gap: var(--slds-g-spacing-4, 1rem);
 }
 
@@ -157,4 +162,12 @@
 
 .rule-search-bar {
     margin-bottom: var(--slds-g-spacing-3, 0.75rem);
+}
+
+/* Keep datatables inside their cards; scroll horizontally instead of overflowing */
+.table-container {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
 }
